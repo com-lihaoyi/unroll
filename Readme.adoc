@@ -1,9 +1,9 @@
-= mill-moduledefs - Scalac compiler plugin to support Mill modules
+= mill-moduledefs
 :toc-placement: preamble
 :toc:
 :version: 0.10.9
 
-Documentation of mill-moduledefs repository.
+A Scalac compiler plugin to support Mill modules.
 
 == About
 
@@ -27,16 +27,58 @@ This code is expected to change rarely.
 
 It should be especially kept stable within the same Mill major version.
 
+=== Publishing
+
+Publishing is automated via GitHub Actions and implemented in the `publishToSonatype` command.
+
+[source,scala]
+----
+def publishToSonatype(
+    sonatypeCreds: String,
+    gpgArgs: String = PublishModule.defaultGpgArgs.mkString(","),
+    dryRun: Boolean = false,
+    artifactsFile: Option[String] = None
+): Command[Unit]
+----
+
+=== Re-publish for a new Scala Release
+:example-version: 0.10.9
+:example-scala-version: 2.13.10
+
 The most frequently expected changes are releases for newer Scala version.
 This is especially needed, as compiler plugins are tied to the exact Scala compiler version.
 
 Hence, this build aims to be flexible enough, to release an already tagged version for newer Scalac releases after the fact.
 
+As an example, to release an already published version `{example-version}` for a new Scala version `{example-scala-version}`, follow these steps:
+
+. Create a branch `release-{example-version}` from the git tag `{example-version}`.
+. Add a file `PUBLISH_ONLY` containing a selector for the artifacts to publish. If you need more than one selector, place each on a new line.
++
+.Example file `PUBLISH_ONLY`
+----
+moduledefs.plugin[2.13.10].publishArtifacts
+----
+. Make sure you don't change the actual code, so that it stays compatible to the orignal tag.
+. Commit your changes.
+. Tag your change with `{example-version}-for-{example-scala-version}`. This will trigger the `publish-sonatype` workflow in GHA.
+. If appropriate, update the Readme/Changelog in the `main` branch.
+
 == Download
 
 Artifacts of this project are released to Maven Central.
 
-The latest verison is {version}.
+[source,scala,subs="verbatim,attributes"]
+----
+// The shared library
+ivy"com-lihaoyi::mill-moduledefs:{version}"
+// The compiler plugin
+ivy"com-lihaoyi:::scalac-mill-moduledefs-plugin:{version}"
+----
+
+== License
+
+This project is published under the https://mit-license.org/[MIT License].
 
 == Changelog
 

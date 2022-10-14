@@ -57,4 +57,4 @@ jobs:
           gpg --list-secret-keys --keyid-format LONG
 
       - name: Publish to Maven Central
-        run: ./millw --no-server publishToSonatype --sonatypeCreds "${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }}" --gpgArgs "--passphrase=${{ secrets.SONATYPE_PGP_PRIVATE_KEY_PASSWORD}},--batch,--yes,-a,-b,--pinentry-mode,loopback"
+        run: ./millw --no-server --debug publishToSonatype --sonatypeCreds "${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }}" --gpgArgs "--passphrase=${{ secrets.SONATYPE_PGP_PRIVATE_KEY_PASSWORD}},--batch,--yes,-a,-b,--pinentry-mode,loopback" --artifactsFile PUBLISH_ONLY
