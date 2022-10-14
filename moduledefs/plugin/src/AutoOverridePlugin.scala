@@ -3,14 +3,11 @@ package mill.moduledefs
 import scala.collection.mutable.ListBuffer
 import scala.reflect.internal.Flags
 import scala.tools.nsc.doc.ScaladocSyntaxAnalyzer
-import scala.tools.nsc.io.VirtualFile
-import scala.tools.nsc.util.BatchSourceFile
-import scala.tools.nsc.{Global, Phase}
 import scala.tools.nsc.plugins.{Plugin, PluginComponent}
 import scala.tools.nsc.transform.Transform
+import scala.tools.nsc.{Global, Phase}
 
 class AutoOverridePlugin(val global: Global) extends Plugin {
-  import global._
   override def init(options: List[String], error: String => Unit): Boolean = true
 
   val name = "auto-override-plugin"
@@ -99,15 +96,7 @@ class AutoOverridePlugin(val global: Global) extends Plugin {
           global.Apply(
             global.Select(
               global.New(
-                global.Select(
-                  global.Select(
-                    global.Ident(
-                      global.newTermName("mill")
-                    ),
-                    global.newTermName("moduledefs")
-                  ),
-                  global.newTypeName("Scaladoc")
-                )
+                AutoOverridePlugin.scaladocAnnotationClassNameTree(global)
               ),
               global.nme.CONSTRUCTOR
             ),
@@ -151,7 +140,7 @@ class AutoOverridePlugin(val global: Global) extends Plugin {
 
       val phaseName = "auto-override"
 
-      override def newPhase(prev: Phase) = new GlobalPhase(prev) {
+      override def newPhase(prev: Phase): Phase = new GlobalPhase(prev) {
 
         def name: String = phaseName
 
@@ -160,7 +149,7 @@ class AutoOverridePlugin(val global: Global) extends Plugin {
             if (owner.isClass) Some(owner.asClass.baseClasses)
             else if (owner.isModule) Some(owner.asModule.baseClasses)
             else None
-          baseClasses.exists(_.exists(_.fullName == "mill.moduledefs.Cacher"))
+          baseClasses.exists(_.exists(_.fullName == AutoOverridePlugin.cacherClassName))
         }
 
         def apply(unit: global.CompilationUnit): Unit = {
@@ -182,4 +171,18 @@ class AutoOverridePlugin(val global: Global) extends Plugin {
       }
     }
   )
+}
+
+object AutoOverridePlugin {
+  private val cacherClassName = "mill.moduledefs.Cacher"
+  private def scaladocAnnotationClassNameTree(global: Global) =
+    global.Select(
+      global.Select(
+        global.Ident(
+          global.newTermName("mill")
+        ),
+        global.newTermName("moduledefs")
+      ),
+      global.newTypeName("Scaladoc")
+    )
 }
