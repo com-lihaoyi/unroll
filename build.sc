@@ -1,13 +1,10 @@
-// plugins and dependencies
-import $ivy.`de.tototec::de.tobiasroeser.mill.vcs.version::0.3.0`
-
 // imports
-import de.tobiasroeser.mill.vcs.version.VcsVersion
 import mill._
 import mill.scalalib._
 import mill.scalalib.publish._
 
 object Settings {
+  val version = "0.10.9-SNAPSHOT"
   val pomOrg = "com.lihaoyi"
   val githubOrg = "com-lihaoyi"
   val githubRepo = "mill"
@@ -22,7 +19,7 @@ object Deps {
 }
 
 trait ModuledefsBase extends ScalaModule with PublishModule {
-  def publishVersion = VcsVersion.vcsState().format()
+  def publishVersion = Settings.version
   def pomSettings = PomSettings(
     description = artifactName(),
     organization = Settings.pomOrg,
