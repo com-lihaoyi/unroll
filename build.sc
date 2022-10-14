@@ -4,10 +4,10 @@ import mill.scalalib._
 import mill.scalalib.publish._
 
 object Settings {
-  val version = "0.10.9-SNAPSHOT"
+  val version = "0.10.9"
   val pomOrg = "com.lihaoyi"
   val githubOrg = "com-lihaoyi"
-  val githubRepo = "mill"
+  val githubRepo = "mill-moduledefs"
   val projectUrl = s"https://github.com/${githubOrg}/${githubRepo}"
 }
 
