@@ -53,15 +53,20 @@ Hence, this build aims to be flexible enough, to release an already tagged versi
 As an example, to release an already published version `{example-version}` for a new Scala version `{example-scala-version}`, follow these steps:
 
 . Create a branch `release-{example-version}` from the git tag `{example-version}`.
+
+. Add the new Scala version the the build setup. . Make sure you don't change the actual code, so that it stays compatible to the original tag.
+
 . Add a file `PUBLISH_ONLY` containing a selector for the artifacts to publish. If you need more than one selector, place each on a new line.
 +
 .Example file `PUBLISH_ONLY`
 ----
 moduledefs.plugin[2.13.10].publishArtifacts
 ----
-. Make sure you don't change the actual code, so that it stays compatible to the orignal tag.
+
 . Commit your changes.
-. Tag your change with `{example-version}-for-{example-scala-version}`. This will trigger the `publish-sonatype` workflow in GHA.
+
+. Tag your commit with `{example-version}-for-{example-scala-version}`. This will trigger the `publish-sonatype` workflow in GHA.
+
 . If appropriate, update the Readme/Changelog in the `main` branch.
 
 == Download
