@@ -1,0 +1,43 @@
+= mill-moduledefs - Scalac compiler plugin to support Mill modules
+:toc-placement: preamble
+:toc:
+:version: 0.10.8-SNAPSHOT
+
+Documentation of mill-moduledefs repository.
+
+== About
+
+The Mill build tool module structure is highly tied to the organizational structure of the Scala programming language.
+Project modules are modelled as Scala ``object``s, Module targets are modelled as Scala ``def``s.
+
+Mill targets are also modelled as free applicatives, which among other things makes the Mill task graph introspectable. To hide some boilerplate code needed to nicely write tasks like ``def``s, Mill uses some Scala macros and a Scalac compiler plugin.
+
+In this project, you'll find the compiler plugin and some shared code.
+
+== Project layout
+
+This project contains two modules:
+
+* `moduledefs` - Some shared code to be used in the Mill classpath
+* `moduledefs/plugin` - A Scalac compiler plugin to be used when compiling Mill projects
+
+== Development and Releases
+
+This code is expected to change rarely.
+
+It should be especially kept stable within the same Mill major version.
+
+The most frequently expected changes are releases for newer Scala version.
+This is especially needed, as compiler plugins are tied to the exact Scala compiler version.
+
+Hence, this build aims to be flexible enough, to release an already tagged version for newer Scalac releases after the fact.
+
+== Download
+
+Artfiact of this projects are released to Maven Central.
+
+The latest verison is {version}.
+
+== Changelog
+
+* Older versions of this project were developed in the Mill git repository and were packaged as ordinary Scala artifact `mill-moduledefs` (without the full Scala version suffix). Refer to  https://github.com/com-lihaoyi/mill/issues/2035[issue #2035], to learn why we split the projects.
