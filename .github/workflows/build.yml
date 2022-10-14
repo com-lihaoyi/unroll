@@ -53,8 +53,8 @@ jobs:
       - name: Setup GPG secrets for publish
         run: |
           gpg --version
-          cat <(echo "${{ secrets.SONATYPE_PGP_SECRET }}") | base64 --decode | gpg --batch --import
+          cat <(echo "${{ secrets.SONATYPE_PGP_PRIVATE_KEY }}") | base64 --decode | gpg --batch --import
           gpg --list-secret-keys --keyid-format LONG
 
       - name: Publish to Maven Central
-        run: ./millw --no-server mill.scalalib.PublishModule/publishAll --sonatypeCreds "${{ secrets.SONATYPE_DEPLOY_USER }}:${{ secrets.SONATYPE_DEPLOY_PASSWORD }}" --gpgArgs "--passphrase=${{ secrets.SONATYPE_PGP_PASSWORD}},--batch,--yes,-a,-b,--pinentry-mode,loopback" --publishArtifacts __.publishArtifacts --readTimeout 600000 --awaitTimeout 600000 --release true --signed true
+        run: ./millw --no-server publishToSonatype --sonatypeCreds "${{ secrets.SONATYPE_USER }}:${{ secrets.SONATYPE_PASSWORD }}" --gpgArgs "--passphrase=${{ secrets.SONATYPE_PGP_PRIVATE_KEY_PASSWORD}},--batch,--yes,-a,-b,--pinentry-mode,loopback"
