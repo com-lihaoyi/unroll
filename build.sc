@@ -65,18 +65,15 @@ def publishToSonatype(
     artifactsFile: Option[String] = None
 ): Command[Unit] = {
 
-  val pubTasks: Seq[String] = artifactsFile match {
+  val pubTasks: Seq[String] = artifactsFile.map(f => os.Path(f, os.pwd)).filter(os.exists) match {
     case None => Seq("__.publishArtifacts")
     case Some(f) =>
-      val tasks = Seq(os.Path(f, os.pwd))
-        .filter(os.exists)
-        .flatMap(p => os.read.lines(p))
+      val tasks = os.read.lines(f)
         .map(_.trim())
-        .filter(_.nonEmpty)
+        .filter(l => l.nonEmpty && !l.startsWith("#"))
       if (tasks.isEmpty) sys.error(s"No artifacts tasks selected. File ${f} cannot be empty.")
       tasks
   }
-
 
   val Right(tasks) = RunScript.resolveTasks(
     mill.main.ResolveTasks,
