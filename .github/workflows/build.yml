@@ -28,7 +28,7 @@ jobs:
 
   publish-sonatype:
     # TODO: also publish release-branches
-    if: github.repository == 'com-lihaoyi/millmoduledefs' && startsWith( github.ref, 'refs/tags/')
+    if: github.repository == 'com-lihaoyi/mill-moduledefs' && startsWith( github.ref, 'refs/tags/')
     needs: [test]
 
     runs-on: ubuntu-latest
