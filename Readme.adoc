@@ -1,7 +1,7 @@
 = mill-moduledefs
 :toc-placement: preamble
 :toc:
-:version: 0.10.9
+:version: 0.10.9-alpha-1
 
 A Scalac compiler plugin to support Mill modules.
 
