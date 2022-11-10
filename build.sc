@@ -7,7 +7,7 @@ import mill.eval.Evaluator
 import mill.define.{SelectMode, Command}
 
 object Settings {
-  val version = "0.10.9-alpha-1"
+  val version = "0.10.9"
   val pomOrg = "com.lihaoyi"
   val githubOrg = "com-lihaoyi"
   val githubRepo = "mill-moduledefs"

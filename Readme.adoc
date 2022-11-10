@@ -1,7 +1,7 @@
 = mill-moduledefs
 :toc-placement: preamble
 :toc:
-:version: 0.10.9-alpha-1
+:version: 0.10.9
 
 A Scalac compiler plugin to support Mill modules.
 
@@ -40,6 +40,11 @@ def publishToSonatype(
     artifactsFile: Option[String] = None
 ): Command[Unit]
 ----
+
+**You need to update the version manually, before creatign the git tag!**
+
+All git tags are automatically published. The tag should reflect the version number.
+
 
 === Re-publish for a new Scala Release
 :example-version: 0.10.9
@@ -86,6 +91,10 @@ ivy"com-lihaoyi:::scalac-mill-moduledefs-plugin:{version}"
 This project is published under the https://mit-license.org/[MIT License].
 
 == Changelog
+
+=== 0.10.9 - 2022-11-10
+
+First stable release from this repository. No feature additions and removals since release `0.10.8` from the Mill repository.
 
 === 0.10.9-alpha-1 - 2022-10-17
 
