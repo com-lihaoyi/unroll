@@ -17,7 +17,7 @@ import dotty.tools.dotc.core.Types.NamedType
 
 import scala.language.implicitConversions
 
-class UnrollPhaseScala3(setting: Setting) extends PluginPhase {
+class UnrollPhaseScala3() extends PluginPhase {
   import tpd._
 
   val phaseName = "unroll"
@@ -26,11 +26,6 @@ class UnrollPhaseScala3(setting: Setting) extends PluginPhase {
 
   override val runsAfter = Set(transform.Pickler.name)
 
-  override def prepareForUnit(tree: Tree)(using Context): Context = {
-    val runtime = requiredModule(setting.runtimeObject)
-    enterSym = runtime.requiredMethod("enter")
-    ctx
-  }
 
   override def transformTemplate(tmpl: tpd.Template)(using Context): tpd.Tree = {
     val newMethods = tmpl.body.collect{
