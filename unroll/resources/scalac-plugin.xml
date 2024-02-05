@@ -1,0 +1,4 @@
+<plugin>
+    <name>unroll</name>
+    <classname>unroll.UnrollPlugin</classname>
+</plugin>
