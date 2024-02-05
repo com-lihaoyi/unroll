@@ -4,9 +4,8 @@ import scala.tools.nsc.transform.{Transform, TypingTransformers}
 import scala.tools.nsc.{Global, Phase}
 import tools.nsc.plugins.PluginComponent
 
-class UnrollPhase(val global: Global) extends PluginComponent with TypingTransformers with Transform {
+class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingTransformers with Transform {
 
-  println("new PluginPhase")
   import global._
 
   val runsAfter = List("typer")
@@ -16,14 +15,12 @@ class UnrollPhase(val global: Global) extends PluginComponent with TypingTransfo
   val phaseName = "unroll"
 
   override def newTransformer(unit: global.CompilationUnit): global.AstTransformer = {
-    println("newTransformer")
     new UnrollTransformer(unit)
   }
 
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
     def transformClassDef(md: ModuleDef): ModuleDef = {
       val allNewMethods = md.impl.body.collect{ case defdef: DefDef =>
-        println("d.name " + defdef.name)
         defdef.symbol.annotations.filter(_.tpe =:= typeOf[unroll.Unroll]).flatMap{ annot =>
           annot.tree.children.tail.map(_.asInstanceOf[NamedArg].rhs) match{
             case Seq(Literal(Constant(s: String))) =>
@@ -38,7 +35,9 @@ class UnrollPhase(val global: Global) extends PluginComponent with TypingTransfo
                     This(TypeName("UnrolledTestMain")).setType(md.tpe),
                     defdef.name
                   ).setType(defdef.tpe),
-                  args = flattenedValueParams.take(paramIndex).map(p => Ident(p.name).setType(p.tpe))
+                  args =
+                    flattenedValueParams.take(paramIndex).map(p => Ident(p.name).setType(p.tpe)) ++
+                    Seq(Ident(defdef.name.toString + "$default$" + (paramIndex + 1)))
                 ).setType(defdef.symbol.asMethod.returnType)
 
                 val forwarderDef = treeCopy.DefDef(

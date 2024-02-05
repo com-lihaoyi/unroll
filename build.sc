@@ -17,7 +17,7 @@ trait UnrollModule extends CrossScalaModule {
     override def scalacPluginClasspath = T{ Agg(UnrollModule.this.jar()) }
 
     override def scalacOptions = T{
-      Seq(s"-Xplugin:${UnrollModule.this.jar().path}", "-Xplugin-require:unroll", "-Xprint:all")
+      Seq(s"-Xplugin:${UnrollModule.this.jar().path}", "-Xplugin-require:unroll"/*, "-Xprint:all"*/)
     }
   }
 }
