@@ -9,6 +9,7 @@ object UnrollTestMain{
     cls.getMethods.filter(_.getName.contains("foo")).foreach(println)
 
     assert(scala.util.Try(cls.getMethod("foo", classOf[String])).isFailure)
+    println()
     assert(
       cls.getMethod("foo", classOf[String], classOf[Int]).invoke(instance, "hello", 2) ==
         "hello2true0"

@@ -26,6 +26,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
             case Seq(Literal(Constant(s: String))) =>
               val flattenedValueParams = defdef.vparamss.flatten
               val startParamIndex = flattenedValueParams.indexWhere(_.name.toString == s)
+
               val endParamIndex = flattenedValueParams.size
               assert(startParamIndex != -1)
 
@@ -54,7 +55,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                 val defaultCalls = {
                   val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
                   val defaultMember = md.symbol.tpe.member(TermName(mangledName))
-                  println("defaultMember.tpe " + defaultMember.tpe)
                   Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
                 }
 
@@ -86,8 +86,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
           }
         }
       }
-
-      println("allNewMethods.flatten.size " + allNewMethods.flatten.size)
 
       md match {
         case _: ModuleDef =>
