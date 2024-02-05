@@ -135,9 +135,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     }
     override def transform(tree: global.Tree): global.Tree = {
       tree match{
-        case d: ModuleDef =>
-          d.symbol.tpe.members.foreach(println)
-          super.transform(transformClassDef(d))
+        case d: ModuleDef => super.transform(transformClassDef(d))
         case d: ClassDef => super.transform(transformClassDef(d))
         case _ => super.transform(tree)
       }
