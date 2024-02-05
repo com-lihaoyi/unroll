@@ -5,7 +5,7 @@ class UnrollTestMain{
   def print2(x: Any) = println(x)
 
   @unroll.Unroll("n")
-  def foo(s: String, n: Int = 1) = print2(s + n)
+  def foo(s: String, n: Int = 1, b: Boolean = true) = print2(s + n + b)
 
 }
 
@@ -22,4 +22,16 @@ object UnrollTestMain{
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
 

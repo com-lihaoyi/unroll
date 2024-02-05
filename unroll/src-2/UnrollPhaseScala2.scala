@@ -30,36 +30,43 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
               assert(startParamIndex != -1)
 
               for(paramIndex <- Range(startParamIndex, endParamIndex)) yield {
+                val newSymbol = md.symbol.newMethod(TermName("foo"))
+                newSymbol.setInfo(defdef.symbol.tpe)
+
                 val newVParamss = List(
                   flattenedValueParams
                     .take(paramIndex)
                     .map { vd =>
-                      val newVd = treeCopy.ValDef(vd, vd.mods, vd.name, vd.tpt, EmptyTree)
-
-                      println("newVd.symbol " + newVd.symbol)
+                      val newVdSymbol = newSymbol.newValueParameter(vd.name)
+                      newVdSymbol.info = vd.symbol.tpe
+                      val newVd = newStrictTreeCopier.ValDef(vd, vd.mods, vd.name, vd.tpt, EmptyTree).setSymbol(newVdSymbol)
                       newVd
                     }
                 )
 
-//                val forwarderCall = Apply(
-//                  fun = Select(
-//                    This(TypeName("UnrolledTestMain")).setType(ThisType(md.symbol.tpe.typeSymbol)).setSymbol(md.symbol),
-//                    defdef.name
-//                  ).setType(defdef.symbol.tpe)
-//                    .setSymbol(defdef.symbol),
-//                  args =
-//                    flattenedValueParams
-//                      .take(paramIndex)
-//                      .zipWithIndex.map{
-//                        case (p, i) => Ident(p.name).setType(p.tpe).setSymbol(newVParamss(0)(i).symbol)
-//                      } ++
-//                    {
-//                      val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
-//                      val defaultMember = md.symbol.tpe.member(TermName(mangledName))
-//                      Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
-//                    }
-//                ).setType(defdef.symbol.asMethod.returnType)
-                val forwarderCall = Literal(Constant(())).setType(typeOf[Unit])
+                val forwardedValueParams = flattenedValueParams
+                  .take(paramIndex)
+                  .zipWithIndex.map{
+                    case (p, i) => Ident(p.name).setType(p.tpe).setSymbol(newVParamss(0)(i).symbol)
+                  }
+
+                val defaultCalls = {
+                  val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
+                  val defaultMember = md.symbol.tpe.member(TermName(mangledName))
+                  Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
+                }
+                
+                val forwarderCall = Apply(
+                  fun = Select(
+                    This(md.symbol).setType(ThisType(md.symbol.tpe.typeSymbol)).setSymbol(md.symbol),
+                    defdef.name
+                  ).setType(defdef.symbol.tpe)
+                    .setSymbol(defdef.symbol),
+                  args = forwardedValueParams ++ defaultCalls
+                ).setType(defdef.symbol.asMethod.returnType)
+
+
+//                val forwarderCall = Literal(Constant(())).setType(typeOf[Unit])
 //                println("forwarderCall.fun.asInstanceOf[Select].qualifier.tpe " + forwarderCall.fun.asInstanceOf[Select].qualifier.tpe)
 //                println("forwarderCall.fun.asInstanceOf[Select].qualifier.symbol " + forwarderCall.fun.asInstanceOf[Select].qualifier.symbol)
                 val forwarderDef = treeCopy.DefDef(
@@ -72,7 +79,10 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                   rhs = forwarderCall
                 )
 
-                val newSymbol = md.symbol.newMethod(TermName("foo"))
+
+                //.changeOwner(forwarderCall0.owner, newSymbol)
+
+
                 newSymbol.setInfo(forwarderDef.symbol.tpe match {
                   case MethodType(params, result) => MethodType(params.take(paramIndex), result)
                 })
