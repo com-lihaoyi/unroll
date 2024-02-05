@@ -1,4 +1,6 @@
-import mill._, scalalib._
+import mill._
+import mill.define.Ctx
+import scalalib._
 
 val scala212  = "2.12.18"
 val scala213  = "2.13.11"
@@ -13,7 +15,11 @@ trait UnrollModule extends CrossScalaModule {
     else  Agg(ivy"org.scala-lang:scala3-compiler_3:${scalaVersion()}")
   }
 
-  object test extends ScalaTests with TestModule.Utest{
+  object tests extends Cross[Tests](Seq("cls", "obj"))
+  trait Tests extends ScalaModule with Cross.Module[String]{
+    def moduleDeps = Seq(UnrollModule.this)
+    override def millSourcePath = super.millSourcePath / crossValue
+    def scalaVersion = UnrollModule.this.scalaVersion()
     override def scalacPluginClasspath = T{ Agg(UnrollModule.this.jar()) }
 
     override def scalacOptions = T{
