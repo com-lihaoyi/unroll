@@ -6,7 +6,7 @@ val scala212  = "2.12.18"
 val scala213  = "2.13.11"
 val scala3  = "3.3.1"
 
-val scalaVersions = Seq(scala213, scala3)
+val scalaVersions = Seq(scala213/*, scala3*/)
 
 object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends CrossScalaModule {
@@ -16,14 +16,21 @@ trait UnrollModule extends CrossScalaModule {
   }
 
   object tests extends Cross[Tests](Seq("cls", "obj"))
-  trait Tests extends ScalaModule with Cross.Module[String]{
-    def moduleDeps = Seq(UnrollModule.this)
+  trait Tests extends Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
-    def scalaVersion = UnrollModule.this.scalaVersion()
-    override def scalacPluginClasspath = T{ Agg(UnrollModule.this.jar()) }
+    object unrolled extends ScalaModule{
+      def moduleDeps = Seq(UnrollModule.this)
+      def scalaVersion = UnrollModule.this.scalaVersion()
+      override def scalacPluginClasspath = T{ Agg(UnrollModule.this.jar()) }
 
-    override def scalacOptions = T{
-      Seq(s"-Xplugin:${UnrollModule.this.jar().path}", "-Xplugin-require:unroll", "-Xprint:all")
+      override def scalacOptions = T{
+        Seq(s"-Xplugin:${UnrollModule.this.jar().path}", "-Xplugin-require:unroll"/*, "-Xprint:all"*/)
+      }
+    }
+    object test extends ScalaModule{
+      def moduleDeps = Seq(unrolled)
+      def scalaVersion = UnrollModule.this.scalaVersion()
     }
   }
 }
+

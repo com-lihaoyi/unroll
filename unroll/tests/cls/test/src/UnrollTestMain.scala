@@ -21,6 +21,8 @@ object UnrollTestMain{
         .invoke(instance, "hello", 2, false, 3) ==
       "hello2false3"
     )
+
+    cls.getMethods.filter(_.getName.contains("foo")).foreach(println)
   }
 }
 

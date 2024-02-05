@@ -30,7 +30,12 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
               assert(startParamIndex != -1)
 
               for(paramIndex <- Range(startParamIndex, endParamIndex)) yield {
-                val newSymbol = md.symbol.newMethod(TermName("foo"))
+                println("md.symbol " + md.symbol)
+                println("md.symbol.isTerm " + md.symbol.isTerm)
+                println("defdef.symbol.owner " + defdef.symbol.owner)
+                println("(defdef.symbol.owner eq md.symbol) " + (defdef.symbol.owner eq md.symbol))
+                val newSymbol = defdef.symbol.owner.newMethod(TermName("foo"))
+
                 newSymbol.setInfo(defdef.symbol.tpe)
 
                 val newVParamss = List(
@@ -55,7 +60,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                   val defaultMember = md.symbol.tpe.member(TermName(mangledName))
                   Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
                 }
-                
+
                 val forwarderCall = Apply(
                   fun = Select(
                     This(md.symbol).setType(ThisType(md.symbol.tpe.typeSymbol)).setSymbol(md.symbol),
@@ -95,33 +100,35 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
       println("allNewMethods.flatten.size " + allNewMethods.flatten.size)
 
-      if (md.isInstanceOf[ModuleDef]){
+      md match {
+        case _: ModuleDef =>
 
-        treeCopy.ModuleDef(
-          md,
-          mods = md.mods,
-          name = md.name,
-          impl = treeCopy.Template(
-            md.impl,
-            parents = md.impl.parents,
-            self = md.impl.self,
-            body = md.impl.body ++ allNewMethods.flatten
+          treeCopy.ModuleDef(
+            md,
+            mods = md.mods,
+            name = md.name,
+            impl = treeCopy.Template(
+              md.impl,
+              parents = md.impl.parents,
+              self = md.impl.self,
+              body = md.impl.body ++ allNewMethods.flatten
+            )
           )
-        )
-      }else if (md.isInstanceOf[ClassDef]){
-        treeCopy.ClassDef(
-          md,
-          mods = md.mods,
-          name = md.name,
-          tparams = md.asInstanceOf[ClassDef].tparams,
-          impl = treeCopy.Template(
-            md.impl,
-            parents = md.impl.parents,
-            self = md.impl.self,
-            body = md.impl.body ++ allNewMethods.flatten
+        case classDef: ClassDef =>
+          treeCopy.ClassDef(
+            md,
+            mods = md.mods,
+            name = md.name,
+            tparams = classDef.tparams,
+            impl = treeCopy.Template(
+              md.impl,
+              parents = md.impl.parents,
+              self = md.impl.self,
+              body = md.impl.body ++ allNewMethods.flatten
+            )
           )
-        )
-      }else ???
+        case _ => ???
+      }
     }
     override def transform(tree: global.Tree): global.Tree = {
       tree match{
