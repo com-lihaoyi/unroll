@@ -30,11 +30,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
               assert(startParamIndex != -1)
 
               for(paramIndex <- Range(startParamIndex, endParamIndex)) yield {
-                println("md.symbol " + md.symbol)
-                println("md.symbol.isTerm " + md.symbol.isTerm)
-                println("defdef.symbol.owner " + defdef.symbol.owner)
-                println("(defdef.symbol.owner eq md.symbol) " + (defdef.symbol.owner eq md.symbol))
-                val newSymbol = defdef.symbol.owner.newMethod(TermName("foo"))
+                val newSymbol = defdef.symbol.owner.newMethod(defdef.name)
 
                 newSymbol.setInfo(defdef.symbol.tpe)
 
@@ -58,22 +54,19 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                 val defaultCalls = {
                   val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
                   val defaultMember = md.symbol.tpe.member(TermName(mangledName))
+                  println("defaultMember.tpe " + defaultMember.tpe)
                   Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
                 }
 
                 val forwarderCall = Apply(
                   fun = Select(
-                    This(md.symbol).setType(ThisType(md.symbol.tpe.typeSymbol)).setSymbol(md.symbol),
+                    This(defdef.symbol.owner).setType(ThisType(defdef.symbol.owner)).setSymbol(defdef.symbol.owner),
                     defdef.name
                   ).setType(defdef.symbol.tpe)
                     .setSymbol(defdef.symbol),
                   args = forwardedValueParams ++ defaultCalls
                 ).setType(defdef.symbol.asMethod.returnType)
-
-
-//                val forwarderCall = Literal(Constant(())).setType(typeOf[Unit])
-//                println("forwarderCall.fun.asInstanceOf[Select].qualifier.tpe " + forwarderCall.fun.asInstanceOf[Select].qualifier.tpe)
-//                println("forwarderCall.fun.asInstanceOf[Select].qualifier.symbol " + forwarderCall.fun.asInstanceOf[Select].qualifier.symbol)
+                // val forwarderCall = Literal(Constant(())).setType(typeOf[Unit])
                 val forwarderDef = treeCopy.DefDef(
                   defdef,
                   mods = defdef.mods,
@@ -83,10 +76,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                   tpt = defdef.tpt,
                   rhs = forwarderCall
                 )
-
-
-                //.changeOwner(forwarderCall0.owner, newSymbol)
-
 
                 newSymbol.setInfo(forwarderDef.symbol.tpe match {
                   case MethodType(params, result) => MethodType(params.take(paramIndex), result)
