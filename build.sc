@@ -29,13 +29,13 @@ trait UnrollModule extends CrossScalaModule {
     override def millSourcePath = super.millSourcePath / crossValue
 
     // Different versions of Unrolled.scala
-    object unrolledNow extends Unrolled {
-      def mimaPreviousArtifacts = Seq(unrolledOld.jar(), unrolledOlder.jar())
+    object now extends Unrolled {
+      def mimaPreviousArtifacts = Seq(old.jar(), now.jar())
     }
-    object unrolledOld extends Unrolled {
-      def mimaPreviousArtifacts = Seq(unrolledOld.jar())
+    object old extends Unrolled {
+      def mimaPreviousArtifacts = Seq(old.jar())
     }
-    object unrolledOlder extends Unrolled{
+    object older extends Unrolled{
       def mimaPreviousArtifacts = Seq[PathRef]()
     }
 
@@ -46,13 +46,13 @@ trait UnrollModule extends CrossScalaModule {
     }
 
     object oldToNow extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(unrolledOld.test.jar(), unrolledNow.jar())
+      def unmanagedClasspath = Agg(old.test.jar(), now.jar())
     }
     object olderToNow extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(unrolledOlder.test.jar(), unrolledNow.jar())
+      def unmanagedClasspath = Agg(older.test.jar(), now.jar())
     }
     object olderToOld extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(unrolledOlder.test.jar(), unrolledOld.jar())
+      def unmanagedClasspath = Agg(older.test.jar(), old.jar())
     }
 
     trait Unrolled extends InnerScalaModule with LocalMimaModule {
@@ -67,12 +67,12 @@ trait UnrollModule extends CrossScalaModule {
         Seq(
           s"-Xplugin:${UnrollModule.this.jar().path}",
           "-Xplugin-require:unroll",
-//          "-Xprint:all"
+          "-Xprint:all"
         )
       }
     }
 
-    def moduleDeps = Seq(unrolledNow)
+    def moduleDeps = Seq(now)
   }
 }
 
@@ -116,13 +116,6 @@ trait LocalMimaModule extends ScalaModule{
     }.toArray
 
     val checkDirection = worker.api.CheckDirection.Backward
-
-    def toWorkerApi(p: ProblemFilter) =
-      new worker.api.ProblemFilter(p.name, p.problem)
-
-    val incompatibleSignatureProblemFilters =
-      Seq(ProblemFilter.exclude[IncompatibleSignatureProblem]("*"))
-
 
     val errorOpt: java.util.Optional[String] = mimaWorker2().reportBinaryIssues(
       scalaVersion() match{
