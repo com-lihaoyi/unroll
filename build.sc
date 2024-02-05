@@ -14,7 +14,7 @@ trait UnrollModule extends CrossScalaModule {
     else  Agg(ivy"org.scala-lang:scala3-compiler_3:${scalaVersion()}")
   }
 
-  object tests extends Cross[Tests](Seq("cls", "obj"))
+  object tests extends Cross[Tests](Seq("cls", "obj", "trt"))
   trait Tests extends ScalaModule with Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
     object unrolled extends ScalaModule{
