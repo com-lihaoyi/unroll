@@ -19,7 +19,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   }
 
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
-    def transformClassDef(md: ModuleDef): ModuleDef = {
+    def transformClassDef(md: ImplDef): ImplDef = {
       val allNewMethods = md.impl.body.collect{ case defdef: DefDef =>
         defdef.symbol.annotations.filter(_.tpe =:= typeOf[unroll.Unroll]).flatMap{ annot =>
           annot.tree.children.tail.map(_.asInstanceOf[NamedArg].rhs) match{
@@ -40,24 +40,28 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                       newVd
                     }
                 )
-                val forwarderCall = Apply(
-                  fun = Select(
-                    This(TypeName("UnrolledTestMain")).setType(md.tpe),
-                    defdef.name
-                  ).setType(defdef.tpe),
-                  args =
-                    flattenedValueParams
-                      .take(paramIndex)
-                      .zipWithIndex.map{
-                        case (p, i) => Ident(p.name).setType(p.tpe).setSymbol(newVParamss(0)(i).symbol)
-                      } ++
-                    {
-                      val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
-                      val defaultMember = md.symbol.tpe.member(TermName(mangledName))
-                      Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
-                    }
-                ).setType(defdef.symbol.asMethod.returnType)
 
+//                val forwarderCall = Apply(
+//                  fun = Select(
+//                    This(TypeName("UnrolledTestMain")).setType(ThisType(md.symbol.tpe.typeSymbol)).setSymbol(md.symbol),
+//                    defdef.name
+//                  ).setType(defdef.symbol.tpe)
+//                    .setSymbol(defdef.symbol),
+//                  args =
+//                    flattenedValueParams
+//                      .take(paramIndex)
+//                      .zipWithIndex.map{
+//                        case (p, i) => Ident(p.name).setType(p.tpe).setSymbol(newVParamss(0)(i).symbol)
+//                      } ++
+//                    {
+//                      val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
+//                      val defaultMember = md.symbol.tpe.member(TermName(mangledName))
+//                      Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
+//                    }
+//                ).setType(defdef.symbol.asMethod.returnType)
+                val forwarderCall = Literal(Constant(())).setType(typeOf[Unit])
+//                println("forwarderCall.fun.asInstanceOf[Select].qualifier.tpe " + forwarderCall.fun.asInstanceOf[Select].qualifier.tpe)
+//                println("forwarderCall.fun.asInstanceOf[Select].qualifier.symbol " + forwarderCall.fun.asInstanceOf[Select].qualifier.symbol)
                 val forwarderDef = treeCopy.DefDef(
                   defdef,
                   mods = defdef.mods,
@@ -68,10 +72,12 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                   rhs = forwarderCall
                 )
 
-                println("A")
-                val res = forwarderDef
-                println("B")
-                res
+                val newSymbol = md.symbol.newMethod(TermName("foo"))
+                newSymbol.setInfo(forwarderDef.symbol.tpe match {
+                  case MethodType(params, result) => MethodType(params.take(paramIndex), result)
+                })
+                forwarderDef.symbol = newSymbol
+                forwarderDef
               }
           }
         }
@@ -79,21 +85,38 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
       println("allNewMethods.flatten.size " + allNewMethods.flatten.size)
 
-      treeCopy.ModuleDef(
-        md,
-        mods = md.mods,
-        name = md.name,
-        impl = treeCopy.Template(
-          md.impl,
-          parents = md.impl.parents,
-          self = md.impl.self,
-          body = md.impl.body ++ allNewMethods.flatten
+      if (md.isInstanceOf[ModuleDef]){
+
+        treeCopy.ModuleDef(
+          md,
+          mods = md.mods,
+          name = md.name,
+          impl = treeCopy.Template(
+            md.impl,
+            parents = md.impl.parents,
+            self = md.impl.self,
+            body = md.impl.body ++ allNewMethods.flatten
+          )
         )
-      )
+      }else if (md.isInstanceOf[ClassDef]){
+        treeCopy.ClassDef(
+          md,
+          mods = md.mods,
+          name = md.name,
+          tparams = md.asInstanceOf[ClassDef].tparams,
+          impl = treeCopy.Template(
+            md.impl,
+            parents = md.impl.parents,
+            self = md.impl.self,
+            body = md.impl.body ++ allNewMethods.flatten
+          )
+        )
+      }else ???
     }
     override def transform(tree: global.Tree): global.Tree = {
       tree match{
         case d: ModuleDef => super.transform(transformClassDef(d))
+        case d: ClassDef => super.transform(transformClassDef(d))
         case _ => super.transform(tree)
       }
     }
