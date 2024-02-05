@@ -22,8 +22,6 @@ class UnrollPhaseScala3() extends PluginPhase {
 
   val phaseName = "unroll"
 
-  private var enterSym: Symbol = _
-
   override val runsAfter = Set(transform.Pickler.name)
 
 
