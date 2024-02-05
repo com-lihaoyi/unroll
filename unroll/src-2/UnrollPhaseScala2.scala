@@ -1,5 +1,6 @@
 package unroll
 
+import scala.tools.nsc.symtab.Flags
 import scala.tools.nsc.transform.{Transform, TypingTransformers}
 import scala.tools.nsc.{Global, Phase}
 import tools.nsc.plugins.PluginComponent
@@ -66,7 +67,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                     .setSymbol(defdef.symbol),
                   args = forwardedValueParams ++ defaultCalls
                 ).setType(defdef.symbol.asMethod.returnType)
-                // val forwarderCall = Literal(Constant(())).setType(typeOf[Unit])
+
                 val forwarderDef = treeCopy.DefDef(
                   defdef,
                   mods = defdef.mods,
@@ -76,11 +77,26 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                   tpt = defdef.tpt,
                   rhs = forwarderCall
                 )
+                println()
+
 
                 newSymbol.setInfo(forwarderDef.symbol.tpe match {
                   case MethodType(params, result) => MethodType(params.take(paramIndex), result)
                 })
                 forwarderDef.symbol = newSymbol
+
+                println("defdef.mods.flags " + defdef.mods.flags)
+                println("forwarderDef.mods.flags " + forwarderDef.mods.flags)
+                println("defdef.symbol.flags " + defdef.symbol.flags)
+                println("forwarderDef.symbol.flags " + forwarderDef.symbol.flags)
+                println("defdef.symbol.flagString " + defdef.symbol.flagString)
+                println("forwarderDef.symbol.flagString " + forwarderDef.symbol.flagString)
+                println("defdef.symbol.isStatic " + defdef.symbol.isStatic)
+                println("forwarderDef.symbol.isStatic " + forwarderDef.symbol.isStatic)
+                println("defdef.symbol.owner.isStaticOwner " + defdef.symbol.owner.isStaticOwner)
+                println("forwarderDef.symbol.owner.isStaticOwner " + forwarderDef.symbol.owner.isStaticOwner)
+                println("defdef.symbol.hasFlag(Flags.STATIC) " + defdef.symbol.hasFlag(Flags.STATIC))
+                println("forwarderDef.symbol.hasFlag(Flags.STATIC) " + forwarderDef.symbol.hasFlag(Flags.STATIC))
                 forwarderDef
               }
           }
@@ -119,7 +135,9 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     }
     override def transform(tree: global.Tree): global.Tree = {
       tree match{
-        case d: ModuleDef => super.transform(transformClassDef(d))
+        case d: ModuleDef =>
+          d.symbol.tpe.members.foreach(println)
+          super.transform(transformClassDef(d))
         case d: ClassDef => super.transform(transformClassDef(d))
         case _ => super.transform(tree)
       }
