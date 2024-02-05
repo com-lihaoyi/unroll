@@ -30,14 +30,32 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
               assert(startParamIndex != -1)
 
               for(paramIndex <- Range(startParamIndex, endParamIndex)) yield {
+                val newVParamss = List(
+                  flattenedValueParams
+                    .take(paramIndex)
+                    .map { vd =>
+                      val newVd = treeCopy.ValDef(vd, vd.mods, vd.name, vd.tpt, EmptyTree)
+
+                      println("newVd.symbol " + newVd.symbol)
+                      newVd
+                    }
+                )
                 val forwarderCall = Apply(
                   fun = Select(
                     This(TypeName("UnrolledTestMain")).setType(md.tpe),
                     defdef.name
                   ).setType(defdef.tpe),
                   args =
-                    flattenedValueParams.take(paramIndex).map(p => Ident(p.name).setType(p.tpe)) ++
-                    Seq(Ident(defdef.name.toString + "$default$" + (paramIndex + 1)))
+                    flattenedValueParams
+                      .take(paramIndex)
+                      .zipWithIndex.map{
+                        case (p, i) => Ident(p.name).setType(p.tpe).setSymbol(newVParamss(0)(i).symbol)
+                      } ++
+                    {
+                      val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
+                      val defaultMember = md.symbol.tpe.member(TermName(mangledName))
+                      Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
+                    }
                 ).setType(defdef.symbol.asMethod.returnType)
 
                 val forwarderDef = treeCopy.DefDef(
@@ -45,13 +63,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                   mods = defdef.mods,
                   name = defdef.name,
                   tparams = defdef.tparams,
-                  vparamss = List(
-                    flattenedValueParams
-                      .take(paramIndex)
-                      .map { vp =>
-                        treeCopy.ValDef(vp, vp.mods, vp.name, vp.tpt, EmptyTree)
-                      }
-                  ),
+                  vparamss = newVParamss,
                   tpt = defdef.tpt,
                   rhs = forwarderCall
                 )

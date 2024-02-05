@@ -44,7 +44,7 @@ class UnrollPhaseScala3() extends PluginPhase {
               rhs = Apply(
                 Ident(NamedType(tmpl.tpe, d.symbol)),
                 allParams.take(n) ++
-                  Seq(Ident(NamedType(tmpl.tpe, termName(d.name.toString + "$default$" + (n + 1)))))
+                  Seq(This(NamedType(tmpl.tpe, termName(d.name.toString + "$default$" + (n + 1)))))
               )
             )
           }
