@@ -24,32 +24,31 @@ class UnrollPhaseScala3() extends PluginPhase {
 
   override val runsAfter = Set(transform.Pickler.name)
 
-
   override def transformTemplate(tmpl: tpd.Template)(using Context): tpd.Tree = {
     val newMethods = tmpl.body.collect{
-      case d: DefDef =>
-        val allParams = d.paramss.asInstanceOf[List[List[ValDef]]].flatten
-        for(annot <- d.symbol.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
+      case defdef: DefDef =>
+        val allParams = defdef.paramss.asInstanceOf[List[List[ValDef]]].flatten
+        for(annot <- defdef.symbol.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
           val Some(Literal(Constant(argName: String))) = annot.argument(0)
-          println("argName " + argName)
 
           val argIndex = allParams.indexWhere(_.name.toString == argName)
-          println("argIndex " + argIndex)
+
 
           for(n <- Range(argIndex, allParams.size)) yield{
-            cpy.DefDef(d)(
-              name = d.name,
+            cpy.DefDef(defdef)(
+              name = defdef.name,
               paramss = List(allParams.take(n)),
-              tpt = d.tpt,
+              tpt = defdef.tpt,
               rhs = Apply(
-                Ident(NamedType(tmpl.tpe, d.symbol)),
+                This(defdef.symbol.owner.asClass).select(defdef.symbol),
                 allParams.take(n) ++
-                  Seq(This(NamedType(tmpl.tpe, termName(d.name.toString + "$default$" + (n + 1)))))
+                Range(n, allParams.size).map(n2 =>
+                  This(defdef.symbol.owner.asClass).select(termName(defdef.name.toString + "$default$" + (n2 + 1)))
+                )
               )
             )
           }
         }
-
     }
 
     super.transformTemplate(
