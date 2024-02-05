@@ -16,7 +16,7 @@ trait UnrollModule extends CrossScalaModule {
   }
 
   object tests extends Cross[Tests](Seq("cls", "obj"))
-  trait Tests extends Cross.Module[String]{
+  trait Tests extends ScalaModule with Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
     object unrolled extends ScalaModule{
       def moduleDeps = Seq(UnrollModule.this)
@@ -27,10 +27,9 @@ trait UnrollModule extends CrossScalaModule {
         Seq(s"-Xplugin:${UnrollModule.this.jar().path}", "-Xplugin-require:unroll"/*, "-Xprint:all"*/)
       }
     }
-    object test extends ScalaModule{
-      def moduleDeps = Seq(unrolled)
-      def scalaVersion = UnrollModule.this.scalaVersion()
-    }
+
+    def moduleDeps = Seq(unrolled)
+    def scalaVersion = UnrollModule.this.scalaVersion()
   }
 }
 
