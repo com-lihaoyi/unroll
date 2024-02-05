@@ -24,18 +24,18 @@ trait UnrollModule extends CrossScalaModule {
   trait InnerScalaModule extends ScalaModule{
     def scalaVersion = UnrollModule.this.scalaVersion()
   }
-  object tests extends Cross[Tests](Seq("cls", "obj"))
+  object tests extends Cross[Tests](Seq("cls", "obj", "trt"))
   trait Tests extends InnerScalaModule with Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
 
     // Different versions of Unrolled.scala
-    object now extends Unrolled {
-      def mimaPreviousArtifacts = Seq(old.jar(), now.jar())
+    object v3 extends Unrolled {
+      def mimaPreviousArtifacts = Seq(v2.jar(), v3.jar())
     }
-    object old extends Unrolled {
-      def mimaPreviousArtifacts = Seq(old.jar())
+    object v2 extends Unrolled {
+      def mimaPreviousArtifacts = Seq(v2.jar())
     }
-    object older extends Unrolled{
+    object v1 extends Unrolled{
       def mimaPreviousArtifacts = Seq[PathRef]()
     }
 
@@ -45,14 +45,14 @@ trait UnrollModule extends CrossScalaModule {
       def mainClass = Some("unroll.UnrollTestMain")
     }
 
-    object oldToNow extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(old.test.jar(), now.jar())
+    object v2v3 extends ComparativeScalaModule{
+      def unmanagedClasspath = Agg(v2.test.jar(), v3.jar())
     }
-    object olderToNow extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(older.test.jar(), now.jar())
+    object v1v3 extends ComparativeScalaModule{
+      def unmanagedClasspath = Agg(v1.test.jar(), v3.jar())
     }
-    object olderToOld extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(older.test.jar(), old.jar())
+    object v1v2 extends ComparativeScalaModule{
+      def unmanagedClasspath = Agg(v1.test.jar(), v2.jar())
     }
 
     trait Unrolled extends InnerScalaModule with LocalMimaModule {
@@ -72,7 +72,7 @@ trait UnrollModule extends CrossScalaModule {
       }
     }
 
-    def moduleDeps = Seq(now)
+    def moduleDeps = Seq(v3)
   }
 }
 
