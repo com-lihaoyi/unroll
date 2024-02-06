@@ -24,7 +24,7 @@ trait UnrollModule extends CrossScalaModule {
   trait InnerScalaModule extends ScalaModule{
     def scalaVersion = UnrollModule.this.scalaVersion()
   }
-  object tests extends Cross[Tests](Seq("cls", "obj", "trt"))
+  object tests extends Cross[Tests](Seq("cls", "obj", "trt", "new"))
   trait Tests extends InnerScalaModule with Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
 
