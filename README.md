@@ -151,7 +151,7 @@ def foo(t: (String, Int)) = println(t)
 Unrolled.unapply(unrolled).map(foo)
 ```
 
-`unapply` is not a binary compatibility issue in Scala 3 due to 
+`unapply` is not a binary compatibility issue in Scala 3, even when called directly, due to 
 [Option-less Pattern Matching](https://docs.scala-lang.org/scala3/reference/changed-features/pattern-matching.html)
 
 ## Testing
