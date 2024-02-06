@@ -9,7 +9,7 @@ import com.github.lolgab.mill.mima.worker.MimaWorkerExternalModule
 import scala.util.chaining._
 
 val scala212  = "2.12.18"
-val scala213  = "2.13.11"
+val scala213  = "2.13.12"
 val scala3  = "3.3.1"
 
 val scalaVersions = Seq(scala213, scala3)
@@ -56,6 +56,7 @@ trait UnrollModule extends CrossScalaModule {
     }
 
     trait Unrolled extends InnerScalaModule with LocalMimaModule {
+      override def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
       object test extends InnerScalaModule{
         def moduleDeps = Seq(Unrolled.this)
       }
@@ -63,11 +64,15 @@ trait UnrollModule extends CrossScalaModule {
       def moduleDeps = Seq(UnrollModule.this)
       override def scalacPluginClasspath = T{ Agg(UnrollModule.this.jar()) }
 
+//      override def scalaCompilerClasspath = T{
+//        super.scalaCompilerClasspath().filter(!_.toString().contains("scala-compiler")) ++
+//        Agg(PathRef(os.Path("/Users/lihaoyi/.ivy2/local/org.scala-lang/scala-compiler/2.13.12-bin-SNAPSHOT/jars/scala-compiler.jar")))
+//      }
       override def scalacOptions = T{
         Seq(
           s"-Xplugin:${UnrollModule.this.jar().path}",
           "-Xplugin-require:unroll",
-          "-Xprint:all"
+//          "-Xprint:all"
         )
       }
     }

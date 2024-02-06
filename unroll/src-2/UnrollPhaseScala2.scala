@@ -20,34 +20,51 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   }
 
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
-    def transformClassDef(md: ImplDef): ImplDef = {
-      val allNewMethods = md.impl.body.collect{ case defdef: DefDef =>
+    def getNewMethods(implDef: ImplDef): List[List[DefDef]] = {
+      implDef.impl.body.collect{ case defdef: DefDef =>
         defdef.symbol.annotations.filter(_.tpe =:= typeOf[unroll.Unroll]).flatMap{ annot =>
           annot.tree.children.tail.map(_.asInstanceOf[NamedArg].rhs) match{
             case Seq(Literal(Constant(s: String))) =>
-              val flattenedValueParams = defdef.vparamss.flatten
-              val startParamIndex = flattenedValueParams.indexWhere(_.name.toString == s)
+              val vparams = defdef.vparamss match{
+                case Seq(single) => single
+                case multiple => abort(
+                  "@Unroll only supports methods with a single parameter list, not " + multiple.size
+                )
+              }
+              val startParamIndex = vparams.indexWhere(_.name.toString == s)
 
-              val endParamIndex = flattenedValueParams.size
-              assert(startParamIndex != -1)
+              val endParamIndex = vparams.size
+              if (startParamIndex == -1) abort("argument to @Unroll must be the name of a parameter")
 
               for(paramIndex <- Range(startParamIndex, endParamIndex)) yield {
-                val newSymbol = defdef.symbol.owner.newMethod(defdef.name)
+                val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
 
-                newSymbol.setInfo(defdef.symbol.tpe)
+                val forwarderParamsSymbols = vparams.take(paramIndex).map { vd =>
+                  val sym = forwarderDefSymbol.newValueParameter(vd.name)
+                  sym.setInfo(vd.symbol.tpe)
+                  sym
+                }
+
+                val forwarderMethodType0 = defdef.symbol.tpe.asInstanceOf[MethodType]
+                val forwarderMethodType = MethodType(forwarderParamsSymbols, forwarderMethodType0.resultType)
+                forwarderDefSymbol.setInfo(forwarderMethodType)
 
                 val newVParamss = List(
-                  flattenedValueParams
+                  vparams
                     .take(paramIndex)
-                    .map { vd =>
-                      val newVdSymbol = newSymbol.newValueParameter(vd.name)
-                      newVdSymbol.info = vd.symbol.tpe
-                      val newVd = newStrictTreeCopier.ValDef(vd, vd.mods, vd.name, vd.tpt, EmptyTree).setSymbol(newVdSymbol)
-                      newVd
+                    .zipWithIndex
+                    .map { case (vd, i) =>
+                      newStrictTreeCopier.ValDef(
+                        vd,
+                        vd.mods.copy(flags = vd.mods.flags ^ Flags.DEFAULTPARAM),
+                        vd.name,
+                        vd.tpt,
+                        EmptyTree
+                      ).setSymbol(forwarderParamsSymbols(i))
                     }
                 )
 
-                val forwardedValueParams = flattenedValueParams
+                val forwardedValueParams = vparams
                   .take(paramIndex)
                   .zipWithIndex.map{
                     case (p, i) => Ident(p.name).setType(p.tpe).setSymbol(newVParamss(0)(i).symbol)
@@ -55,7 +72,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
                 val defaultCalls = {
                   val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
-                  val defaultMember = md.symbol.tpe.member(TermName(mangledName))
+                  val defaultMember = implDef.symbol.tpe.member(TermName(mangledName))
                   Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe))
                 }
 
@@ -76,67 +93,57 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                   vparamss = newVParamss,
                   tpt = defdef.tpt,
                   rhs = forwarderCall
-                )
-                println()
+                ).setSymbol(forwarderDefSymbol)
 
-
-                newSymbol.setInfo(forwarderDef.symbol.tpe match {
+                forwarderDefSymbol.setInfo(forwarderDef.symbol.tpe match {
                   case MethodType(params, result) => MethodType(params.take(paramIndex), result)
                 })
-                forwarderDef.symbol = newSymbol
+                forwarderDef.symbol = forwarderDefSymbol
 
-                println("defdef.mods.flags " + defdef.mods.flags)
-                println("forwarderDef.mods.flags " + forwarderDef.mods.flags)
-                println("defdef.symbol.flags " + defdef.symbol.flags)
-                println("forwarderDef.symbol.flags " + forwarderDef.symbol.flags)
-                println("defdef.symbol.flagString " + defdef.symbol.flagString)
-                println("forwarderDef.symbol.flagString " + forwarderDef.symbol.flagString)
-                println("defdef.symbol.isStatic " + defdef.symbol.isStatic)
-                println("forwarderDef.symbol.isStatic " + forwarderDef.symbol.isStatic)
-                println("defdef.symbol.owner.isStaticOwner " + defdef.symbol.owner.isStaticOwner)
-                println("forwarderDef.symbol.owner.isStaticOwner " + forwarderDef.symbol.owner.isStaticOwner)
-                println("defdef.symbol.hasFlag(Flags.STATIC) " + defdef.symbol.hasFlag(Flags.STATIC))
-                println("forwarderDef.symbol.hasFlag(Flags.STATIC) " + forwarderDef.symbol.hasFlag(Flags.STATIC))
                 forwarderDef
               }
           }
         }
       }
-
-      md match {
-        case _: ModuleDef =>
-
-          treeCopy.ModuleDef(
-            md,
-            mods = md.mods,
-            name = md.name,
-            impl = treeCopy.Template(
-              md.impl,
-              parents = md.impl.parents,
-              self = md.impl.self,
-              body = md.impl.body ++ allNewMethods.flatten
-            )
-          )
-        case classDef: ClassDef =>
-          treeCopy.ClassDef(
-            md,
-            mods = md.mods,
-            name = md.name,
-            tparams = classDef.tparams,
-            impl = treeCopy.Template(
-              md.impl,
-              parents = md.impl.parents,
-              self = md.impl.self,
-              body = md.impl.body ++ allNewMethods.flatten
-            )
-          )
-        case _ => ???
-      }
     }
     override def transform(tree: global.Tree): global.Tree = {
       tree match{
-        case d: ModuleDef => super.transform(transformClassDef(d))
-        case d: ClassDef => super.transform(transformClassDef(d))
+        case md: ModuleDef =>
+          val allNewMethods = getNewMethods(md).flatten
+
+          val classInfoType = md.symbol.moduleClass.info.asInstanceOf[ClassInfoType]
+          val newClassInfoType = classInfoType.copy(decls = newScopeWith(allNewMethods.map(_.symbol) ++ classInfoType.decls:_*))
+
+          md.symbol.moduleClass.setInfo(newClassInfoType)
+          super.transform(
+            treeCopy.ModuleDef(
+              md,
+              mods = md.mods,
+              name = md.name,
+              impl = treeCopy.Template(
+                md.impl,
+                parents = md.impl.parents,
+                self = md.impl.self,
+                body = md.impl.body ++ allNewMethods
+              )
+            )
+          )
+        case cd: ClassDef =>
+          val allNewMethods = getNewMethods(cd).flatten
+          super.transform(
+            treeCopy.ClassDef(
+              cd,
+              mods = cd.mods,
+              name = cd.name,
+              tparams = cd.tparams,
+              impl = treeCopy.Template(
+                cd.impl,
+                parents = cd.impl.parents,
+                self = cd.impl.self,
+                body = cd.impl.body ++ allNewMethods
+              )
+            )
+          )
         case _ => super.transform(tree)
       }
     }
