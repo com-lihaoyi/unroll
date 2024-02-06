@@ -2,13 +2,14 @@ package unroll
 
 object UnrollTestMain{
   def main(args: Array[String]): Unit = {
-    println(new Unrolled{}.foo("cow"))
-    println(new Unrolled{}.foo("cow", 2))
-    println(new Unrolled{}.foo("cow", 2, false))
+    val unrolled = new Unrolled{}
+    println(unrolled.foo("cow"))
+    println(unrolled.foo("cow", 2))
+    println(unrolled.foo("cow", 2, false))
 
-    assert(new Unrolled {}.foo("cow").startsWith("cow1true"))
-    assert(new Unrolled {}.foo("cow", 2).startsWith("cow2true"))
-    assert(new Unrolled {}.foo("cow", 2, false).startsWith("cow2false"))
+    assert(unrolled.foo("cow").startsWith("cow1true"))
+    assert(unrolled.foo("cow", 2).startsWith("cow2true"))
+    assert(unrolled.foo("cow", 2, false).startsWith("cow2false"))
   }
 }
 

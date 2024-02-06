@@ -1,12 +1,5 @@
 # unroll
 
-Doesn't work yet, use the following commands to test:
-
-```bash
-./mill -i -w "unroll[2.13.11].tests[_]"
-./mill -i -w "unroll[3.3.1].tests[_]"
-```
-
 ## Usage
 
 Unroll provides the `@unroll.Unroll(from: String)` annotation that can be applied
@@ -93,7 +86,7 @@ class Unrolled() {
 
 ## Testing
 
-Unroll is tested via the following testcases
+Unroll is tested via the following test-cases
 
 1. `cls` (Class Method)
 2. `obj` (Object Method)
@@ -103,20 +96,30 @@ Unroll is tested via the following testcases
 Each of these cases has three versions, `v1` `v2` `v3`, each of which has 
 different numbers of default parameters
 
-For each testcase, we have the following tests:
+For each test-case, we have the following tests:
 
-1. `unroll[<scala-version>].tests[<config>]`: Using java reflection to make
+1. `unroll[<scala-version>].tests[<test-case>]`: Using java reflection to make
    sure the correct methods are generated in version `v3` and are callable with the
    correct output
 
-2. `unroll[<scala-version>].tests[<config>].{v1,v2,v3}.test`: Tests compiled against
-   the respective version of a testcase and running against the same version
+2. `unroll[<scala-version>].tests[<test-case>].{v1,v2,v3}.test`: Tests compiled against
+   the respective version of a test-case and running against the same version
 
-3. `unroll[<scala-version>].tests[<config>].{v1v2,v2v3,v1v3}.test`: Tests compiled
-   an *older* version of a testcase but running against *newer* version. This simulates
+3. `unroll[<scala-version>].tests[<test-case>].{v1v2,v2v3,v1v3}.test`: Tests compiled
+   an *older* version of a test-case but running against *newer* version. This simulates
    a downstream library compiled against an older version of an upstream library but
    running against a newer version, ensuring there is backwards binary compatibility
 
-4. `unroll[<scala-version>].tests[<config>].{v1,v2,v3}.mimaReportBinaryIssues`: Running
+4. `unroll[<scala-version>].tests[<test-case>].{v1,v2,v3}.mimaReportBinaryIssues`: Running
    the Scala [MiMa Migration Manager](https://github.com/lightbend/mima) to check a newer
-   version of testcase against an older version for binary compatibility
+   version of test-case against an older version for binary compatibility
+
+You can also run the following command to run all tests:
+
+```bash
+./mill -i -w "unroll[_].tests.__.run"         
+```
+
+This can be useful as a final sanity check, even though you usually want to run
+a subset of the tests specific to the `scala-version` and `test-case` you are 
+interested in.
