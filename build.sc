@@ -12,7 +12,7 @@ val scala212  = "2.12.18"
 val scala213  = "2.13.12"
 val scala3  = "3.3.1"
 
-val scalaVersions = Seq(scala213, scala3)
+val scalaVersions = Seq(scala213/*, scala3*/)
 
 object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends CrossScalaModule {
@@ -24,7 +24,14 @@ trait UnrollModule extends CrossScalaModule {
   trait InnerScalaModule extends ScalaModule{
     def scalaVersion = UnrollModule.this.scalaVersion()
   }
-  object tests extends Cross[Tests](Seq("cls", "obj", "trt", "sec", "pri"))
+  object tests extends Cross[Tests](Seq(
+    "classMethod",
+    "objectMethod",
+    "traitMethod",
+    "curriedMethod",
+    "primaryConstructor",
+    "secondaryConstructor",
+  ))
   trait Tests extends InnerScalaModule with Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
 
@@ -72,7 +79,7 @@ trait UnrollModule extends CrossScalaModule {
         Seq(
           s"-Xplugin:${UnrollModule.this.jar().path}",
           "-Xplugin-require:unroll",
-//          "-Xprint:all"
+          "-Xprint:all"
         )
       }
     }

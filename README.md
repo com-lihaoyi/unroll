@@ -89,10 +89,12 @@ class Unrolled() {
 
 Unroll is tested via the following test-cases
 
-1. `cls` (Class Method)
-2. `obj` (Object Method)
-3. `trt` (Trait Method)
-4. `pri` (Primary Constructor
+* `classMethod`
+* `objectMethod`
+* `traitMethod`
+* `primaryConstructor`
+* `secondaryConstructor`
+* `curried`
 
 Each of these cases has three versions, `v1` `v2` `v3`, each of which has 
 different numbers of default parameters
