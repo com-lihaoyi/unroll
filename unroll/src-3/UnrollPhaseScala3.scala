@@ -56,14 +56,11 @@ class UnrollPhaseScala3() extends PluginPhase {
                 name = newSymbol.name,
                 paramss = List(paramss),
                 tpt = defdef.tpt,
-                rhs = Block(
-                  Nil,
-                  Apply(
-                    This(defdef.symbol.owner.asClass).select(defdef.symbol),
-                    paramss.map(p => ref(p.symbol)) ++
-                    Range(n, allParams.size).map(n2 =>
-                      This(defdef.symbol.owner.asClass).select(DefaultGetterName(defdef.name, n2))
-                    )
+                rhs = Apply(
+                  This(defdef.symbol.owner.asClass).select(defdef.symbol),
+                  paramss.map(p => ref(p.symbol)) ++
+                  Range(n, allParams.size).map(n2 =>
+                    This(defdef.symbol.owner.asClass).select(DefaultGetterName(defdef.name, n2))
                   )
                 )
               ),
