@@ -1,15 +1,13 @@
 package unroll
 
+import unroll.TestUtils.logAssertStartsWith
+
 object UnrollTestMain{
   def main(args: Array[String]): Unit = {
     val unrolled = new Unrolled{}
-    println(unrolled.foo("cow"))
-    println(unrolled.foo("cow", 2))
-    println(unrolled.foo("cow", 2, false))
-
-    assert(unrolled.foo("cow").startsWith("cow1true"))
-    assert(unrolled.foo("cow", 2).startsWith("cow2true"))
-    assert(unrolled.foo("cow", 2, false).startsWith("cow2false"))
+    logAssertStartsWith(unrolled.foo("cow"), "cow1true")
+    logAssertStartsWith(unrolled.foo("cow", 2), "cow2true")
+    logAssertStartsWith(unrolled.foo("cow", 2, false), "cow2false")
   }
 }
 

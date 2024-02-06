@@ -14,6 +14,7 @@ val scala3  = "3.3.1"
 
 val scalaVersions = Seq(scala213, scala3)
 
+
 object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends CrossScalaModule {
   def ivyDeps = T{
@@ -24,23 +25,29 @@ trait UnrollModule extends CrossScalaModule {
   trait InnerScalaModule extends ScalaModule{
     def scalaVersion = UnrollModule.this.scalaVersion()
   }
-  object tests extends Cross[Tests](Seq(
+
+  object testutils extends InnerScalaModule
+
+  val testcases = Seq(
     "classMethod",
     "objectMethod",
     "traitMethod",
     "curriedMethod",
     "primaryConstructor",
     "secondaryConstructor",
-  ))
+  ) ++ Option.when(crossValue.startsWith("3."))("caseclass")
+
+  object tests extends Cross[Tests](testcases)
+
   trait Tests extends InnerScalaModule with Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
 
     // Different versions of Unrolled.scala
     object v3 extends Unrolled {
-      def mimaPreviousArtifacts = Seq(v2.jar(), v3.jar())
+      def mimaPreviousArtifacts = Seq(v1.jar(), v2.jar())
     }
     object v2 extends Unrolled {
-      def mimaPreviousArtifacts = Seq(v2.jar())
+      def mimaPreviousArtifacts = Seq(v1.jar())
     }
     object v1 extends Unrolled{
       def mimaPreviousArtifacts = Seq[PathRef]()
@@ -53,19 +60,19 @@ trait UnrollModule extends CrossScalaModule {
     }
 
     object v2v3 extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(v2.test.jar(), v3.jar())
+      def unmanagedClasspath = Agg(v2.test.jar(), v3.jar(), testutils.jar())
     }
     object v1v3 extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(v1.test.jar(), v3.jar())
+      def unmanagedClasspath = Agg(v1.test.jar(), v3.jar(), testutils.jar())
     }
     object v1v2 extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(v1.test.jar(), v2.jar())
+      def unmanagedClasspath = Agg(v1.test.jar(), v2.jar(), testutils.jar())
     }
 
     trait Unrolled extends InnerScalaModule with LocalMimaModule {
       override def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
       object test extends InnerScalaModule{
-        def moduleDeps = Seq(Unrolled.this)
+        def moduleDeps = Seq(Unrolled.this, testutils)
       }
 
       def moduleDeps = Seq(UnrollModule.this)
@@ -79,7 +86,7 @@ trait UnrollModule extends CrossScalaModule {
         Seq(
           s"-Xplugin:${UnrollModule.this.jar().path}",
           "-Xplugin-require:unroll",
-          // "-Xprint:all"
+          // "-Xprint:typer"
         )
       }
     }

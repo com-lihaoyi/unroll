@@ -1,12 +1,11 @@
 package unroll
 
+import unroll.TestUtils.logAssertStartsWith
+
 object UnrollTestMain{
   def main(args: Array[String]): Unit = {
-    println(new Unrolled("cow").foo)
-    println(new Unrolled("cow", 2).foo)
-
-    assert(new Unrolled("cow").foo.startsWith("cow1"))
-    assert(new Unrolled("cow", 2).foo.startsWith("cow2"))
+    logAssertStartsWith(new Unrolled("cow").foo, "cow1")
+    logAssertStartsWith(new Unrolled("cow", 2).foo, "cow2")
   }
 }
 

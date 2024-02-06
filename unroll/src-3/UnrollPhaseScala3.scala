@@ -40,7 +40,10 @@ class UnrollPhaseScala3() extends PluginPhase {
       import dotty.tools.dotc.core.NameOps.isConstructorName
       val firstParams :: restParams = defdef.paramss.asInstanceOf[List[List[ValDef]]]
 
-      val annotated = if (defdef.symbol.isPrimaryConstructor) defdef.symbol.owner else defdef.symbol
+      val annotated =
+        if (defdef.symbol.isPrimaryConstructor || defdef.name.toString == "copy") defdef.symbol.owner
+        else if (defdef.name.toString == "apply") defdef.symbol.owner.companionClass
+        else defdef.symbol
 
       for (annot <- annotated.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
         val Some(Literal(Constant(argName: String))) = annot.argument(0)
@@ -68,16 +71,19 @@ class UnrollPhaseScala3() extends PluginPhase {
             if (defdef.symbol.isConstructor) {
               ref(defdef.symbol.owner.companionModule)
                 .select(DefaultGetterName(defdef.name, n))
+            } else if (defdef.name.toString == "apply"){
+              ref(defdef.symbol.owner.companionModule)
+                .select(DefaultGetterName(termName("<init>"), n))
             } else {
               This(defdef.symbol.owner.asClass)
                 .select(DefaultGetterName(defdef.name, n))
             }
           }
-          
-          val allNewParamTrees = 
+
+          val allNewParamTrees =
             List(newFirstParamss.map(p => ref(p.symbol)) ++ defaultCalls) ++
             newRestParamss.map(_.map(p => ref(p.symbol)))
-          
+
           var applyTree: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
 
           for (newParams <- allNewParamTrees) applyTree = Apply(applyTree, newParams)
