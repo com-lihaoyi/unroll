@@ -21,6 +21,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
     def getNewMethods(implDef: ImplDef): List[List[DefDef]] = {
+      implDef match{
+        case c: ClassDef =>
+          println(c)
+        case _ =>
+      }
       implDef.impl.body.collect{ case defdef: DefDef =>
         defdef.symbol.annotations.filter(_.tpe =:= typeOf[unroll.Unroll]).flatMap{ annot =>
           annot.tree.children.tail.map(_.asInstanceOf[NamedArg].rhs) match{
