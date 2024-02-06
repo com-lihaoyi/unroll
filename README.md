@@ -85,16 +85,45 @@ class Unrolled() {
 }
 ```
 
+### Case Classes
+
+```scala
+@unroll.Unroll("b")
+case class Unrolled(s: String, n: Int = 1, b: Boolean = true){
+  def foo = s + n + b
+}
+```
+
+Unrolls to:
+
+```scala
+@unroll.Unroll("b")
+case class Unrolled(s: String, n: Int = 1, b: Boolean = true){
+   def this(s: String, n: Int) = this(s, n, true)
+   def copy(s: String, n: Int) = copy(s, n, true)
+   def foo = s + n + b
+}
+object Unrolled{
+   def apply(s: String, n: Int) = apply(s, n, true)
+}
+```
+
+
+## Limitations
+
+1. Only the first parameter list of multi-parameter list methods (i.e. curried or taking
+   implicits) can be unrolled. This is an implementation restriction that may be lifted in 
+   future
+
+2. Unrolled case classes are only fully binary compatible in Scala 3. This is because the
+   signature of `unapply` cannot be unrolled in Scala 2 due to type erasure making the
+   generated forwarders ambiguous
+
 ## Testing
 
-Unroll is tested via the following test-cases
-
-* `classMethod`
-* `objectMethod`
-* `traitMethod`
-* `primaryConstructor`
-* `secondaryConstructor`
-* `curried`
+Unroll is tested via a range of test-cases: `classMethod`, `objectMethod`, etc. These
+are organized in `build.sc`, to take advantage of the build system's ability to wire up
+compilation and classpaths 
 
 Each of these cases has three versions, `v1` `v2` `v3`, each of which has 
 different numbers of default parameters

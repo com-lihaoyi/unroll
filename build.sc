@@ -33,6 +33,7 @@ trait UnrollModule extends CrossScalaModule {
     "objectMethod",
     "traitMethod",
     "curriedMethod",
+    "methodWithImplicit",
     "primaryConstructor",
     "secondaryConstructor",
   ) ++ Option.when(crossValue.startsWith("3."))("caseclass")
