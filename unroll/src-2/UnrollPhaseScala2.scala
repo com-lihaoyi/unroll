@@ -74,23 +74,25 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       Ident(mangledName).setSymbol(defaultMember).set(defaultMember)
     }
 
-    val thisTree = This(defdef.symbol.owner).set(defdef.symbol.owner)
+    val forwarderThis = This(defdef.symbol.owner).set(defdef.symbol.owner)
 
-    val superThisTree =
-      if (defdef.symbol.isConstructor) Super(thisTree, typeNames.EMPTY).set(defdef.symbol.owner)
-      else thisTree
+    val forwarderInner =
+      if (defdef.symbol.isConstructor) Super(forwarderThis, typeNames.EMPTY).set(defdef.symbol.owner)
+      else forwarderThis
 
-    val inner = Select(superThisTree, defdef.name).set(defdef.symbol)
+    val nestedForwarderMethodTypes = Seq
+      .iterate(defdef.symbol.tpe, defdef.vparamss.length + 1){ case MethodType(args, res) => res }
+      .drop(1)
 
-    var forwarderCall0 = Apply(fun = inner, args = forwardedValueParams ++ defaultCalls)
-      .setType(defdef.symbol.asMethod.returnType)
+    val forwarderCallArgs =
+      Seq(forwardedValueParams ++ defaultCalls) ++
+      newVParamss.tail.map(_.map( p => Ident(p.name).set(p.symbol)))
 
-    for (ps <- newVParamss.tail) {
-      forwarderCall0 = Apply(
-        fun = forwarderCall0,
-        args = ps.map( p => Ident(p.name).set(p.symbol))
-      ).setType(typeOf[(String, String) => String])
-    }
+    val forwarderCall0 = forwarderCallArgs
+      .zip(nestedForwarderMethodTypes)
+      .foldLeft(Select(forwarderInner, defdef.name).set(defdef.symbol): Tree){
+        case (lhs, (ps, methodType)) => Apply(fun = lhs, args = ps).setType(methodType)
+      }
 
     val forwarderCall =
       if (!defdef.symbol.isConstructor) forwarderCall0

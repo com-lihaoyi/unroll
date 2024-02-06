@@ -69,28 +69,31 @@ class UnrollPhaseScala3() extends PluginPhase {
 
     val allNewParamTrees =
       List(newFirstParamss.map(p => ref(p.symbol)) ++ defaultCalls) ++
-        newRestParamss.map(_.map(p => ref(p.symbol)))
+      newRestParamss.map(_.map(p => ref(p.symbol)))
 
-    var applyTree: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
+    val forwarderInner: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
 
-    for (newParams <- allNewParamTrees) applyTree = Apply(applyTree, newParams)
+    val forwarderCall0 = allNewParamTrees.foldLeft[Tree](forwarderInner){
+      case (lhs: Tree, newParams) => Apply(lhs, newParams)
+    }
+
+    val forwarderCall =
+      if (!defdef.symbol.isConstructor) forwarderCall0
+      else Block(List(forwarderCall0), Literal(Constant(())))
 
     val newDefDef = implicitly[Context].typeAssigner.assignType(
       cpy.DefDef(defdef)(
         name = forwarderDefSymbol.name,
         paramss = List(newFirstParamss) ++ newRestParamss,
         tpt = defdef.tpt,
-        rhs =
-          if (!defdef.symbol.isConstructor) applyTree
-          else Block(List(applyTree), Literal(Constant(())))
+        rhs = forwarderCall
       ),
       forwarderDefSymbol
     )
 
     newDefDef
-
   }
-  
+
   def generateDefForwarders(defdef: DefDef)(using Context) = {
     import dotty.tools.dotc.core.NameOps.isConstructorName
     val firstParamList :: otherParamLists = defdef.paramss.asInstanceOf[List[List[ValDef]]]
@@ -110,7 +113,7 @@ class UnrollPhaseScala3() extends PluginPhase {
       val Some(Literal(Constant(argName: String))) = annot.argument(0)
       val startParamIndex = firstParamList.indexWhere(_.name.toString == argName)
       if (startParamIndex == -1) sys.error("argument to @Unroll must be the name of a parameter")
-      
+
       val prevMethodType = defdef.symbol.info.asInstanceOf[MethodType]
       for (paramIndex <- Range(startParamIndex, firstParamList.size)) yield {
         generateSingleForwarder(

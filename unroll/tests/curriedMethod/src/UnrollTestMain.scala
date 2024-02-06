@@ -11,7 +11,7 @@ object UnrollTestMain{
     )
 
     assert(
-      cls.getMethod("foo", classOf[String], classOf[Int], classOf[String => String]).invoke(instance, "hello", 2, identity[String](_)) ==
+      cls.getMethod("foo", classOf[String], classOf[Int], classOf[String => String]).invoke(instance, "hello", 2: Integer, identity[String](_)) ==
       "hello2true0"
     )
     assert(
