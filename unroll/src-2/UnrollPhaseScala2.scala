@@ -31,7 +31,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
     def getNewMethods(implDef: ImplDef): List[List[DefDef]] = {
       implDef.impl.body.collect{ case defdef: DefDef =>
-        findUnrollAnnotation(defdef.symbol.annotations).flatMap{s =>
+        val annotated =
+          if (defdef.symbol.isPrimaryConstructor) defdef.symbol.owner
+          else defdef.symbol
+
+        findUnrollAnnotation(annotated.annotations).flatMap{s =>
           getNewMethods0(implDef, defdef, s)
         }
       }

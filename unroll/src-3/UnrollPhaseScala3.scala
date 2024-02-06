@@ -31,7 +31,10 @@ class UnrollPhaseScala3() extends PluginPhase {
       case defdef: DefDef =>
         import dotty.tools.dotc.core.NameOps.isConstructorName
         val allParams = defdef.paramss.asInstanceOf[List[List[ValDef]]].flatten
-        for(annot <- defdef.symbol.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
+
+        val annotated = if (defdef.symbol.isPrimaryConstructor) defdef.symbol.owner else defdef.symbol
+
+        for(annot <- annotated.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
           val Some(Literal(Constant(argName: String))) = annot.argument(0)
 
           val argIndex = allParams.indexWhere(_.name.toString == argName)

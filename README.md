@@ -11,14 +11,13 @@ Doesn't work yet, use the following commands to test:
 
 Unroll is tested via the following cases
 
-| version \ testcase | cls (Class Method) | obj (Object Method) | trt (Trait Method) | new (Class Constructor) |
-|--------------------|--------------------|---------------------|--------------------|-------------------------|
-| v1                 | 0 defaults         | 1 default           | 1 default          | 1 default               |
-| v2                 | 2 default          | 2 defaults          | 2 defaults         | 2 defaults              |
-| v3                 | 3 defaults         | 3 defaults          | 3 defaults         | 3 defaults              |
+1. cls (Class Method)
+2. obj (Object Method)
+3. trt (Trait Method)
+4. pri (Primary Constructor
 
-`cls` intentionally has different set of default parameters as the others, to try
-and provide broader test coverage.
+Each of these cases has three versions, `v1` `v2` `v3`, each of which has 
+different numbers of default parameters
 
 For each testcase, we have the following tests:
 
