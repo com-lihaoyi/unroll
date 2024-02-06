@@ -112,10 +112,13 @@ object Unrolled{
 ## Limitations
 
 1. Only the first parameter list of multi-parameter list methods (i.e. curried or taking
-   implicits) can be unrolled. This is an implementation restriction that may be lifted in 
-   future
+   implicits) can be unrolled. This is an implementation restriction that may be lifted 
+   with a bit of work
 
-2. Unrolled case classes are only fully binary compatible in Scala 3, though they are
+2. As unrolling generates synthetic forwarder methods for binary compatibility, it is 
+   possible for them to collide if your unrolled method has manually-defined overloads
+
+3. Unrolled case classes are only fully binary compatible in Scala 3, though they are
    _almost_ binary compatible in Scala 2. Direct calls to `unapply` are binary incompatible,
    but most common pattern matching of `case class`es goes through a different code path
    that _is_ binary compatible. In practice this should be sufficient for 99% of use cases,
