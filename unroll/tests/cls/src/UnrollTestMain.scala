@@ -5,8 +5,11 @@ object UnrollTestMain{
     val instance = new Unrolled()
     val cls = classOf[Unrolled]
 
-    assert(scala.util.Try(cls.getMethod("foo", classOf[String])).isFailure)
-    println()
+    assert(
+      cls.getMethod("foo", classOf[String]).invoke(instance, "hello") ==
+      "hello1true0"
+    )
+
     assert(
       cls.getMethod("foo", classOf[String], classOf[Int]).invoke(instance, "hello", 2) ==
       "hello2true0"

@@ -43,7 +43,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
           "@Unroll only supports methods with a single parameter list, not " + multiple.size
         )
       }
-      println(showRaw(defdef.rhs))
+
       val startParamIndex = vparams.indexWhere(_.name.toString == s)
 
       val endParamIndex = vparams.size
@@ -85,14 +85,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
         val defaultCalls = {
           val mangledName = defdef.name.toString + "$default$" + (paramIndex + 1)
-          println("mangledName " + mangledName)
-
 
           val defaultOwner =
             if (defdef.symbol.isConstructor) implDef.symbol.companionModule
             else implDef.symbol
           val defaultMember = defaultOwner.tpe.member(TermName(scala.reflect.NameTransformer.encode(mangledName)))
-          println("defaultMember " + defaultMember)
           Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe).setSymbol(defaultMember))
         }
 
