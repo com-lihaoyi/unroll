@@ -11,6 +11,8 @@ to methods, classes, and constructors. Downstream code compiled against an old
 version of your library with fewer parameters would continue to work, calling the
 generated forwarders.
 
+## Usage
+
 ### Methods
 
 ```scala
