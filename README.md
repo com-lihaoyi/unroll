@@ -1,6 +1,5 @@
 # unroll
 
-## Usage
 
 Unroll provides the `@unroll.Unroll(from: String)` annotation that can be applied
 to methods, classes, and constructors. `@Unroll` generates unrolled/telescoping
