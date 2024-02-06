@@ -1,9 +1,9 @@
 # unroll
 
 
-Unroll provides the `@unroll.Unroll(from: String)` annotation that can be applied
+Unroll provides the `@unroll.Unroll("foo")` annotation that can be applied
 to methods, classes, and constructors. `@Unroll` generates unrolled/telescoping
-versions of the method, starting from the parameter specified by `from`, which
+versions of the method, starting from the parameter specified by `"foo"`, which
 are simple forwarders to the primary method or constructor implementation. 
 
 `@Unroll` makes it easy to preserve binary compatibility when adding default parameters
