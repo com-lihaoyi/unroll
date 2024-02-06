@@ -1,6 +1,5 @@
 package unroll
 
-@unroll.Unroll("b")
-class Unrolled(s: String, n: Int = 1, b: Boolean = true){
+class Unrolled @unroll.Unroll("b") (s: String, n: Int = 1, b: Boolean = true){
   def foo = s + n + b
 }

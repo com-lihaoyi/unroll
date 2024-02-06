@@ -95,7 +95,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
           println("defaultMember " + defaultMember)
           Seq(Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe).setSymbol(defaultMember))
         }
-        
+
         val forwarderCall = if (defdef.symbol.isConstructor) {
           Block(
             List(

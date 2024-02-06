@@ -27,10 +27,17 @@ class UnrollPhaseScala3() extends PluginPhase {
   override val runsAfter = Set(transform.Pickler.name)
 
   override def transformTemplate(tmpl: tpd.Template)(using Context): tpd.Tree = {
-    val newMethods = tmpl.body.collect{
+    println("transformTemplate")
+    val newMethods = (tmpl.body ++ Seq(tmpl.constr)).collect{
       case defdef: DefDef =>
+        import dotty.tools.dotc.core.NameOps.isConstructorName
+        println()
+        println(defdef.name)
+        println(defdef.name.toTermName.isConstructorName)
+        println(defdef)
         val allParams = defdef.paramss.asInstanceOf[List[List[ValDef]]].flatten
         for(annot <- defdef.symbol.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
+          println("Unrolling " + defdef)
           val Some(Literal(Constant(argName: String))) = annot.argument(0)
 
           val argIndex = allParams.indexWhere(_.name.toString == argName)
@@ -60,7 +67,13 @@ class UnrollPhaseScala3() extends PluginPhase {
                   This(defdef.symbol.owner.asClass).select(defdef.symbol),
                   paramss.map(p => ref(p.symbol)) ++
                   Range(n, allParams.size).map(n2 =>
-                    This(defdef.symbol.owner.asClass).select(DefaultGetterName(defdef.name, n2))
+                    if (defdef.symbol.isConstructor){
+                      ref(defdef.symbol.owner.companionModule)
+                        .select(DefaultGetterName(defdef.name, n2))
+                    }else{
+                      This(defdef.symbol.owner.asClass)
+                        .select(DefaultGetterName(defdef.name, n2))
+                    }
                   )
                 )
               ),
