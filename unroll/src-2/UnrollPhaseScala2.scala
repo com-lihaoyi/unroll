@@ -37,12 +37,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   implicit class Setter[T <: Tree](t: T){
     def set(s: Symbol) = t.setType(s.tpe).setSymbol(s)
   }
-  def generateForwarder(implDef: ImplDef,
-                        defdef: DefDef,
-                        paramIndex: Int,
-                        endParamIndex: Int,
-                        vparams: List[ValDef],
-                        otherVParamss: List[List[ValDef]]) = {
+  def generateSingleForwarder(implDef: ImplDef,
+                              defdef: DefDef,
+                              paramIndex: Int,
+                              firstParamList: List[ValDef],
+                              otherParamLists: List[List[ValDef]]) = {
     val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
     val symbolReplacements = defdef
       .vparamss
@@ -60,11 +59,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     forwarderDefSymbol.setInfo(forwarderMethodType)
 
     val newVParamss =
-      List(vparams.take(paramIndex).map(copyValDef)) ++ otherVParamss.map(_.map(copyValDef))
+      List(firstParamList.take(paramIndex).map(copyValDef)) ++ otherParamLists.map(_.map(copyValDef))
 
-    val forwardedValueParams = vparams.take(paramIndex).map(p => Ident(p.name).set(p.symbol))
+    val forwardedValueParams = firstParamList.take(paramIndex).map(p => Ident(p.name).set(p.symbol))
 
-    val defaultCalls = for (p <- Range(paramIndex, endParamIndex)) yield {
+    val defaultCalls = for (p <- Range(paramIndex, firstParamList.size)) yield {
       val mangledName = defdef.name.toString + "$default$" + (p + 1)
 
       val defaultOwner =
@@ -112,28 +111,27 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
   }
 
-  def getNewMethods0(implDef: ImplDef, defdef: DefDef, s: String) = defdef.vparamss match {
+  def generateDefForwarders(implDef: ImplDef, defdef: DefDef, s: String) = defdef.vparamss match {
     case Nil => Nil
-    case vparams :: otherVParamss =>
-      val startParamIndex = vparams.indexWhere(_.name.toString == s)
-      val endParamIndex = vparams.size
+    case firstParamList :: otherParamLists =>
+      val startParamIndex = firstParamList.indexWhere(_.name.toString == s)
       if (startParamIndex == -1) abort("argument to @Unroll must be the name of a parameter")
 
-      for (paramIndex <- Range(startParamIndex, endParamIndex)) yield {
-        generateForwarder(implDef, defdef, paramIndex, endParamIndex, vparams, otherVParamss)
+      for (paramIndex <- Range(startParamIndex, firstParamList.length)) yield {
+        generateSingleForwarder(implDef, defdef, paramIndex, firstParamList, otherParamLists)
       }
   }
 
 
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
-    def getNewMethods(implDef: ImplDef): List[List[DefDef]] = {
+    def generateDefForwarders2(implDef: ImplDef): List[List[DefDef]] = {
       implDef.impl.body.collect{ case defdef: DefDef =>
         val annotated =
           if (defdef.symbol.isPrimaryConstructor) defdef.symbol.owner
           else defdef.symbol
 
         findUnrollAnnotation(annotated.annotations).flatMap{s =>
-          getNewMethods0(implDef, defdef, s)
+          generateDefForwarders(implDef, defdef, s)
         }
       }
     }
@@ -141,7 +139,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     override def transform(tree: global.Tree): global.Tree = {
       tree match{
         case md: ModuleDef =>
-          val allNewMethods = getNewMethods(md).flatten
+          val allNewMethods = generateDefForwarders2(md).flatten
 
           val classInfoType = md.symbol.moduleClass.info.asInstanceOf[ClassInfoType]
           val newClassInfoType = classInfoType.copy(decls = newScopeWith(allNewMethods.map(_.symbol) ++ classInfoType.decls:_*))
@@ -161,7 +159,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
             )
           )
         case cd: ClassDef =>
-          val allNewMethods = getNewMethods(cd).flatten
+          val allNewMethods = generateDefForwarders2(cd).flatten
           super.transform(
             treeCopy.ClassDef(
               cd,
