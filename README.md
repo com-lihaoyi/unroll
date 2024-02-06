@@ -6,10 +6,31 @@ to methods, classes, and constructors. `@Unroll` generates unrolled/telescoping
 versions of the method, starting from the parameter specified by `from`, which
 are simple forwarders to the primary method or constructor implementation. 
 
-This makes it easy to preserve binary compatibility when adding default parameters
+`@Unroll` makes it easy to preserve binary compatibility when adding default parameters
 to methods, classes, and constructors. Downstream code compiled against an old
 version of your library with fewer parameters would continue to work, calling the
 generated forwarders.
+
+In the past, evolving code in Scala while maintaining binary compatibility was a pain.
+You couldn't use default parameters, you couldn't use case classes. Many people fell
+back to Java-style builder patterns and factories with `.withFoo` everywhere to maintain binary
+compatibility. Or you would tediously define tons of binary compatibility stub methods
+that just copy-paste the original signature and forward the call to the new implementation.
+
+In effect, you often gave up everything that made Scala nice to read and write, because
+the alternative was worse: every time you added a new parameter to a method, even though
+it has a default value, all your users would have to recompile all their code. And all 
+*their* users would need to re-compile all their code, transitively. And so library
+maintainers would suffer so their users could have a smooth upgrading experience.
+
+With `@Unroll`, none of this is a problem anymore. You can add new parameters
+where-ever you like: method `def`s, `class`es, `case class`es, etc. As long as the
+new parameter has a default value, you can `@Unroll` it to generate the binary-compatibility
+stub forwarder method automatically. Happy library maintainers, happy users, everyone is happy!
+
+See this original discussion for more context:
+
+* https://contributors.scala-lang.org/t/can-we-make-adding-a-parameter-with-a-default-value-binary-compatible
 
 ## Usage
 
