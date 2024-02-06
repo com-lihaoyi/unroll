@@ -7,14 +7,81 @@ Doesn't work yet, use the following commands to test:
 ./mill -i -w "unroll[3.3.1].tests[_]"
 ```
 
+## Usage
+
+Unroll provides the `@unroll.Unroll(from: String)` annotation that can be applied
+to methods, classes, and constructors. `@Unroll` generates unrolled/telescoping
+versions of the method, starting from the parameter specified by `from`, which
+are simple forwarders to the primary method or constructor implementation. 
+
+This makes it easy to preserve binary compatibility when adding default parameters
+to methods, classes, and constructors. Downstream code compiled against an old
+version of your library with fewer parameters would continue to work, calling the
+generated forwarders.
+
+### Methods
+
+```scala
+object Unrolled{
+   @unroll.Unroll("b")
+   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = s + n + b + l
+}
+```
+
+```scala
+object Unrolled{
+   @unroll.Unroll("b")
+   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = s + n + b + l
+
+   def foo(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
+   def foo(s: String, n: Int) = foo(s, n, true, 0)
+}
+````
+### Classes
+
+```scala
+@unroll.Unroll("b")
+class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
+   def foo = s + n + b + l
+}
+```
+```scala
+@unroll.Unroll("b")
+class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
+   def foo = s + n + b + l
+
+   def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0)
+   def this(s: String, n: Int) = this(s, n, true, 0)
+}
+```
+
+### Constructors
+
+```scala
+class Unrolled() {
+   var foo = ""
+
+   @unroll.Unroll("b")
+   def this(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = {
+      this()
+      foo = s + n + b + l
+   }
+
+   def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0)
+   def this(s: String, n: Int) = this(s, n, true, 0)
+}
+
+```
+
+
 ## Testing
 
-Unroll is tested via the following cases
+Unroll is tested via the following testcases
 
-1. cls (Class Method)
-2. obj (Object Method)
-3. trt (Trait Method)
-4. pri (Primary Constructor
+1. `cls` (Class Method)
+2. `obj` (Object Method)
+3. `trt` (Trait Method)
+4. `pri` (Primary Constructor
 
 Each of these cases has three versions, `v1` `v2` `v3`, each of which has 
 different numbers of default parameters
