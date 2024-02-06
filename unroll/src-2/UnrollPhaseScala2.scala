@@ -15,13 +15,13 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
   val phaseName = "unroll"
 
-  override def newTransformer(unit: global.CompilationUnit): global.AstTransformer = {
+  override def newTransformer(unit: global.CompilationUnit): global.Transformer = {
     new UnrollTransformer(unit)
   }
 
   def findUnrollAnnotation(annotations: Seq[Annotation]): List[String] = {
     annotations.toList.filter(_.tpe =:= typeOf[unroll.Unroll]).flatMap { annot =>
-      annot.tree.children.tail.map(_.asInstanceOf[NamedArg].rhs) match {
+      annot.tree.children.tail match {
         case Seq(Literal(Constant(s: String))) => Some(s)
         case _ => None
       }

@@ -11,17 +11,17 @@ object UnrollTestMain{
     )
 
     assert(
-      cls.getMethod("foo", classOf[String], classOf[Int]).invoke(instance, "hello", 2) ==
+      cls.getMethod("foo", classOf[String], classOf[Int]).invoke(instance, "hello", 2: Integer) ==
       "hello2true0"
     )
     assert(
       cls.getMethod("foo", classOf[String], classOf[Int], classOf[Boolean])
-        .invoke(instance, "hello", 2, false) ==
+        .invoke(instance, "hello", 2: Integer, java.lang.Boolean.FALSE) ==
       "hello2false0"
     )
     assert(
       cls.getMethod("foo", classOf[String], classOf[Int], classOf[Boolean], classOf[Long])
-        .invoke(instance, "hello", 2, false, 3) ==
+        .invoke(instance, "hello", 2: Integer, java.lang.Boolean.FALSE, 3: Integer) ==
       "hello2false3"
     )
 
