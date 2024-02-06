@@ -128,8 +128,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
     def generateDefForwarders2(implDef: ImplDef): List[List[DefDef]] = {
       implDef.impl.body.collect{ case defdef: DefDef =>
+
         val annotated =
           if (defdef.symbol.isPrimaryConstructor) defdef.symbol.owner
+          else if (defdef.symbol.isCaseApplyOrUnapply && defdef.symbol.name.toString == "apply") defdef.symbol.owner.companionClass
+          else if (defdef.symbol.isCaseCopy && defdef.symbol.name.toString == "copy") defdef.symbol.owner
           else defdef.symbol
 
         findUnrollAnnotation(annotated.annotations).flatMap{s =>

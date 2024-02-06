@@ -115,9 +115,20 @@ object Unrolled{
    implicits) can be unrolled. This is an implementation restriction that may be lifted in 
    future
 
-2. Unrolled case classes are only fully binary compatible in Scala 3. This is because the
-   signature of `unapply` cannot be unrolled in Scala 2 due to type erasure making the
-   generated forwarders ambiguous
+2. Unrolled case classes are only fully binary compatible in Scala 3, though they are
+   _almost_ binary compatible in Scala 2. Direct calls to `unapply` are binary incompatible,
+   but most common pattern matching of `case class`es goes through a different code path
+   that _is_ binary compatible. In practice this should be sufficient for 99% of use cases,
+   but it does means that it is possible for code written as below to fail in Scala 2
+   if a new unrolled parameter is added to the case class `Unrolled`.
+
+```scala
+def foo(t: (String, Int)) = println(t)
+Unrolled.unapply(unrolled).map(foo)
+```
+
+`unapply` is not a binary compatibility issue in Scala 3 due to 
+[Option-less Pattern Matching](https://docs.scala-lang.org/scala3/reference/changed-features/pattern-matching.html)
 
 ## Testing
 

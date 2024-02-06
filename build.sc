@@ -36,7 +36,8 @@ trait UnrollModule extends CrossScalaModule {
     "methodWithImplicit",
     "primaryConstructor",
     "secondaryConstructor",
-  ) ++ Option.when(crossValue.startsWith("3."))("caseclass")
+    "caseclass"
+  )
 
   object tests extends Cross[Tests](testcases)
 
@@ -88,6 +89,7 @@ trait UnrollModule extends CrossScalaModule {
           s"-Xplugin:${UnrollModule.this.jar().path}",
           "-Xplugin-require:unroll",
           //"-Xprint:all",
+          //"-Xprint:typer",
           //"-Xprint:unroll",
           //"-Xprint:patmat",
           //"-Xprint:superaccessors"
