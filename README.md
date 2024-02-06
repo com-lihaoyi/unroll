@@ -4,12 +4,7 @@
 Unroll provides the `@unroll.Unroll("foo")` annotation that can be applied
 to methods, classes, and constructors. `@Unroll` generates unrolled/telescoping
 versions of the method, starting from the parameter specified by `"foo"`, which
-are simple forwarders to the primary method or constructor implementation. 
-
-`@Unroll` makes it easy to preserve binary compatibility when adding default parameters
-to methods, classes, and constructors. Downstream code compiled against an old
-version of your library with fewer parameters would continue to work, calling the
-generated forwarders.
+are simple forwarders to the primary method or constructor implementation.
 
 In the past, evolving code in Scala while maintaining binary compatibility was a pain.
 You couldn't use default parameters, you couldn't use case classes. Many people fell
