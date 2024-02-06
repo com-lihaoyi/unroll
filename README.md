@@ -28,6 +28,8 @@ object Unrolled{
 }
 ```
 
+Unrolls to:
+
 ```scala
 object Unrolled{
    @unroll.Unroll("b")
@@ -45,6 +47,9 @@ class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
    def foo = s + n + b + l
 }
 ```
+
+Unrolls to:
+
 ```scala
 @unroll.Unroll("b")
 class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
@@ -66,13 +71,25 @@ class Unrolled() {
       this()
       foo = s + n + b + l
    }
+}
+```
+
+Unrolls to:
+
+```scala
+class Unrolled() {
+   var foo = ""
+
+   @unroll.Unroll("b")
+   def this(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = {
+      this()
+      foo = s + n + b + l
+   }
 
    def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0)
    def this(s: String, n: Int) = this(s, n, true, 0)
 }
-
 ```
-
 
 ## Testing
 
