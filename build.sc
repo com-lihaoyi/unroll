@@ -79,7 +79,7 @@ trait UnrollModule extends CrossScalaModule {
         Seq(
           s"-Xplugin:${UnrollModule.this.jar().path}",
           "-Xplugin-require:unroll",
-          "-Xprint:all"
+          // "-Xprint:all"
         )
       }
     }

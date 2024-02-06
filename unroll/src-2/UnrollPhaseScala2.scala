@@ -28,6 +28,103 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     }
   }
 
+  def copyValDef(vd: ValDef) = {
+    val newMods = vd.mods.copy(flags = vd.mods.flags ^ Flags.DEFAULTPARAM)
+    newStrictTreeCopier.ValDef(vd, newMods, vd.name, vd.tpt, EmptyTree)
+      .setSymbol(vd.symbol)
+  }
+
+  implicit class Setter[T <: Tree](t: T){
+    def set(s: Symbol) = t.setType(s.tpe).setSymbol(s)
+  }
+  def generateForwarder(implDef: ImplDef,
+                        defdef: DefDef,
+                        paramIndex: Int,
+                        endParamIndex: Int,
+                        vparams: List[ValDef],
+                        otherVParamss: List[List[ValDef]]) = {
+    val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
+    val symbolReplacements = defdef
+      .vparamss
+      .flatten
+      .map { p =>
+          val newPSymbol = forwarderDefSymbol.newValueParameter(p.name)
+          newPSymbol.setInfo(p.symbol.tpe)
+          p.symbol -> newPSymbol
+        }
+      .toMap
+
+    val MethodType(originalParams, result) = defdef.symbol.tpe
+    val forwarderParams = originalParams.map(symbolReplacements)
+    val forwarderMethodType = MethodType(forwarderParams.take(paramIndex), result)
+    forwarderDefSymbol.setInfo(forwarderMethodType)
+
+    val newVParamss =
+      List(vparams.take(paramIndex).map(copyValDef)) ++ otherVParamss.map(_.map(copyValDef))
+
+    val forwardedValueParams = vparams.take(paramIndex).map(p => Ident(p.name).set(p.symbol))
+
+    val defaultCalls = for (p <- Range(paramIndex, endParamIndex)) yield {
+      val mangledName = defdef.name.toString + "$default$" + (p + 1)
+
+      val defaultOwner =
+        if (defdef.symbol.isConstructor) implDef.symbol.companionModule
+        else implDef.symbol
+
+      val defaultMember = defaultOwner.tpe.member(TermName(scala.reflect.NameTransformer.encode(mangledName)))
+      Ident(mangledName).setSymbol(defaultMember).set(defaultMember)
+    }
+
+    val thisTree = This(defdef.symbol.owner).set(defdef.symbol.owner)
+
+    val superThisTree =
+      if (defdef.symbol.isConstructor) Super(thisTree, typeNames.EMPTY).set(defdef.symbol.owner)
+      else thisTree
+
+    val inner = Select(superThisTree, defdef.name).set(defdef.symbol)
+
+    var forwarderCall0 = Apply(fun = inner, args = forwardedValueParams ++ defaultCalls)
+      .setType(defdef.symbol.asMethod.returnType)
+
+    for (ps <- newVParamss.tail) {
+      forwarderCall0 = Apply(
+        fun = forwarderCall0,
+        args = ps.map( p => Ident(p.name).set(p.symbol))
+      ).setType(typeOf[(String, String) => String])
+    }
+
+    val forwarderCall =
+      if (!defdef.symbol.isConstructor) forwarderCall0
+      else Block(List(forwarderCall0), Literal(Constant(())).setType(typeOf[Unit]))
+
+    val forwarderDef = treeCopy.DefDef(
+      defdef,
+      mods = defdef.mods,
+      name = defdef.name,
+      tparams = defdef.tparams,
+      vparamss = newVParamss,
+      tpt = defdef.tpt,
+      rhs = forwarderCall
+    ).setSymbol(forwarderDefSymbol)
+
+    val (fromSyms, toSyms) = symbolReplacements.toList.unzip
+    forwarderDef.substituteSymbols(fromSyms, toSyms).asInstanceOf[DefDef]
+
+  }
+
+  def getNewMethods0(implDef: ImplDef, defdef: DefDef, s: String) = defdef.vparamss match {
+    case Nil => Nil
+    case vparams :: otherVParamss =>
+      val startParamIndex = vparams.indexWhere(_.name.toString == s)
+      val endParamIndex = vparams.size
+      if (startParamIndex == -1) abort("argument to @Unroll must be the name of a parameter")
+
+      for (paramIndex <- Range(startParamIndex, endParamIndex)) yield {
+        generateForwarder(implDef, defdef, paramIndex, endParamIndex, vparams, otherVParamss)
+      }
+  }
+
+
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
     def getNewMethods(implDef: ImplDef): List[List[DefDef]] = {
       implDef.impl.body.collect{ case defdef: DefDef =>
@@ -39,127 +136,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
           getNewMethods0(implDef, defdef, s)
         }
       }
-    }
-    def getNewMethods0(implDef: ImplDef, defdef: DefDef, s: String) = defdef.vparamss match {
-      case Nil => Nil
-      case vparams :: otherVParamss =>
-        val startParamIndex = vparams.indexWhere(_.name.toString == s)
-        val endParamIndex = vparams.size
-        if (startParamIndex == -1) abort("argument to @Unroll must be the name of a parameter")
-
-        for (paramIndex <- Range(startParamIndex, endParamIndex)) yield {
-          val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
-          val otherParamSymbolReplacement = otherVParamss.flatten.map{p =>
-            val newPSymbol = forwarderDefSymbol.newValueParameter(p.name)
-            newPSymbol.setInfo(p.symbol.tpe)
-            p.symbol -> newPSymbol
-          }
-
-          val otherParamSymbolReplacementMap = otherParamSymbolReplacement.toMap
-
-          val forwarderParamsSymbols = vparams.take(paramIndex).map { vd =>
-            val sym = forwarderDefSymbol.newValueParameter(vd.name)
-            sym.setInfo(vd.symbol.tpe)
-            sym
-          }
-
-          val forwarderMethodType0 = defdef.symbol.tpe.asInstanceOf[MethodType]
-          val forwarderMethodType = MethodType(forwarderParamsSymbols, forwarderMethodType0.resultType)
-          forwarderDefSymbol.setInfo(forwarderMethodType)
-
-          val newVParamss =
-            List(vparams
-              .take(paramIndex)
-              .zipWithIndex
-              .map { case (vd, i) =>
-                newStrictTreeCopier.ValDef(
-                  vd,
-                  vd.mods.copy(flags = vd.mods.flags ^ Flags.DEFAULTPARAM),
-                  vd.name,
-                  vd.tpt,
-                  EmptyTree
-                ).setSymbol(forwarderParamsSymbols(i))
-              }) ++ otherVParamss.map(_.map{vd =>
-              newStrictTreeCopier.ValDef(
-                vd,
-                vd.mods.copy(flags = vd.mods.flags ^ Flags.DEFAULTPARAM),
-                vd.name,
-                vd.tpt,
-                EmptyTree
-              ).substituteSymbols(otherParamSymbolReplacement.unzip._1, otherParamSymbolReplacement.unzip._2)
-                .asInstanceOf[ValDef]
-            })
-
-
-          val forwardedValueParams = vparams
-            .take(paramIndex)
-            .zipWithIndex.map {
-              case (p, i) => Ident(p.name).setType(p.tpe).setSymbol(newVParamss(0)(i).symbol)
-            }
-
-          val defaultCalls = for(p <- Range(paramIndex, endParamIndex)) yield {
-            val mangledName = defdef.name.toString + "$default$" + (p + 1)
-
-            val defaultOwner =
-              if (defdef.symbol.isConstructor) implDef.symbol.companionModule
-              else implDef.symbol
-            val defaultMember = defaultOwner.tpe.member(TermName(scala.reflect.NameTransformer.encode(mangledName)))
-            Ident(mangledName).setSymbol(defaultMember).setType(defaultMember.tpe).setSymbol(defaultMember)
-          }
-
-          val inner0 = if (defdef.symbol.isConstructor) {
-            Super(This(defdef.symbol.owner).setType(ThisType(defdef.symbol.owner)).setSymbol(defdef.symbol.owner), typeNames.EMPTY)
-              .setType(ThisType(defdef.symbol.owner)).setSymbol(defdef.symbol.owner)
-          }else {
-            This(defdef.symbol.owner).setType(ThisType(defdef.symbol.owner)).setSymbol(defdef.symbol.owner)
-          }
-
-          val inner = Select(
-            inner0,
-            defdef.name
-          ).setType(defdef.symbol.tpe)
-            .setSymbol(defdef.symbol)
-
-          var forwarderCall0 = Apply(
-            fun = inner,
-            args = forwardedValueParams ++ defaultCalls
-          ).setType(defdef.symbol.asMethod.returnType)
-
-          for((otherVParams, i) <- otherVParamss.zipWithIndex){
-            forwarderCall0 = Apply(
-              fun = forwarderCall0,
-              args = newVParamss(i+1).zipWithIndex.map { case (p, j) =>
-                Ident(p.name).setType(p.tpe).setSymbol(otherParamSymbolReplacementMap(otherVParams(j).symbol))
-
-              }
-            ).setType(typeOf[(String, String) => String])
-          }
-
-          val forwarderCall = if (defdef.symbol.isConstructor){
-            Block(
-              List(forwarderCall0),
-              Literal(Constant(())).setType(typeOf[Unit])
-            ).setType(typeOf[Unit])
-          }else forwarderCall0
-
-          val forwarderDef = treeCopy.DefDef(
-            defdef,
-            mods = defdef.mods,
-            name = defdef.name,
-            tparams = defdef.tparams,
-            vparamss = newVParamss,
-            tpt = defdef.tpt,
-            rhs = forwarderCall
-          ).setSymbol(forwarderDefSymbol)
-
-          forwarderDefSymbol.setInfo(forwarderDef.symbol.tpe match {
-            case MethodType(params, result) => MethodType(params.take(paramIndex), result)
-          })
-          forwarderDef.symbol = forwarderDefSymbol
-
-          forwarderDef
-        }
-
     }
 
     override def transform(tree: global.Tree): global.Tree = {
