@@ -98,13 +98,18 @@ Unrolls to:
 
 ```scala
 @unroll.Unroll("b")
-case class Unrolled(s: String, n: Int = 1, b: Boolean = true){
-   def this(s: String, n: Int) = this(s, n, true)
-   def copy(s: String, n: Int) = copy(s, n, true)
+case class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0L){
+   def this(s: String, n: Int) = this(s, n, true, 0L)
+   def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0L)
+   
+   def copy(s: String, n: Int) = copy(s, n, true, 0L)
+   def copy(s: String, n: Int, b: Boolean) = copy(s, n, b, 0L)
+   
    def foo = s + n + b
 }
 object Unrolled{
-   def apply(s: String, n: Int) = apply(s, n, true)
+   def apply(s: String, n: Int) = apply(s, n, true, 0L)
+   def apply(s: String, n: Int, b: Boolean) = apply(s, n, b, , 0L)
 }
 ```
 
