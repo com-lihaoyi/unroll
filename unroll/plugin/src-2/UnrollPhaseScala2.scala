@@ -34,6 +34,12 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       .setSymbol(vd.symbol)
   }
 
+  def copySymbol(owner: Symbol, s: Symbol) = {
+    val newSymbol = owner.newValueParameter(s.name.toTermName)
+    newSymbol.setInfo(s.tpe)
+    newSymbol
+  }
+
   implicit class Setter[T <: Tree](t: T){
     def set(s: Symbol) = t.setType(s.tpe).setSymbol(s)
   }
@@ -46,16 +52,28 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     val symbolReplacements = defdef
       .vparamss
       .flatten
-      .map { p =>
-          val newPSymbol = forwarderDefSymbol.newValueParameter(p.name)
-          newPSymbol.setInfo(p.symbol.tpe)
-          p.symbol -> newPSymbol
-        }
-      .toMap
+      .map { p => p.symbol -> copySymbol(forwarderDefSymbol, p.symbol) }
+      .toMap ++ {
+      defdef.symbol.tpe match{
+        case MethodType(originalParams, result) => Nil
+        case PolyType(tparams, MethodType(originalParams, result)) =>
+          // Not sure why this is necessary, but the `originalParams` here
+          // is different from `defdef.vparamss`, and we need both
+          originalParams.map(p => (p, copySymbol(forwarderDefSymbol, p)))
+      }
+    }
 
-    val MethodType(originalParams, result) = defdef.symbol.tpe
-    val forwarderParams = originalParams.map(symbolReplacements)
-    val forwarderMethodType = MethodType(forwarderParams.take(paramIndex), result)
+    val forwarderMethodType = defdef.symbol.tpe match{
+      case MethodType(originalParams, result) =>
+        val forwarderParams = originalParams.map(symbolReplacements)
+        MethodType(forwarderParams.take(paramIndex), result)
+
+      case PolyType(tparams, MethodType(originalParams, result)) =>
+        println(originalParams.map(_.hashCode))
+        val forwarderParams = originalParams.map(symbolReplacements)
+        PolyType(tparams, MethodType(forwarderParams.take(paramIndex), result))
+    }
+
     forwarderDefSymbol.setInfo(forwarderMethodType)
 
     val newVParamss =
@@ -81,7 +99,10 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       else forwarderThis
 
     val nestedForwarderMethodTypes = Seq
-      .iterate(defdef.symbol.tpe, defdef.vparamss.length + 1){ case MethodType(args, res) => res }
+      .iterate(defdef.symbol.tpe, defdef.vparamss.length + 1){
+        case MethodType(args, res) => res
+        case PolyType(tparams, MethodType(args, res)) => res
+      }
       .drop(1)
 
     val forwarderCallArgs =

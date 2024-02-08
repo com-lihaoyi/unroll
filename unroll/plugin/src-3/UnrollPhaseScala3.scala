@@ -14,7 +14,7 @@ import StdNames.nme
 import Names.*
 import Constants.Constant
 import dotty.tools.dotc.core.NameKinds.DefaultGetterName
-import dotty.tools.dotc.core.Types.{MethodType, NamedType}
+import dotty.tools.dotc.core.Types.{MethodType, NamedType, PolyType, Type}
 import dotty.tools.dotc.core.Symbols
 
 import scala.language.implicitConversions
@@ -33,16 +33,28 @@ class UnrollPhaseScala3() extends PluginPhase {
     )
   }
 
+  def copyParam2(p: TypeDef, parent: Symbol)(using Context) = {
+    implicitly[Context].typeAssigner.assignType(
+      cpy.TypeDef(p)(p.name, p.rhs),
+      Symbols.newSymbol(parent, p.name, p.symbol.flags, p.symbol.info)
+    )
+  }
+
   def generateSingleForwarder(defdef: DefDef,
-                              prevMethodType: MethodType,
-                              firstParamList: List[ValDef],
-                              otherParamLists: List[List[ValDef]],
+                              prevMethodType: Type,
+                              paramLists: List[ParamClause],
+                              firstValueParamClauseIndex: Int,
                               paramIndex: Int,
                               isCaseApply: Boolean)(using Context) = {
-    val truncatedMethodType = MethodType(
-      prevMethodType.paramInfos.take(paramIndex),
-      prevMethodType.resType
-    )
+
+    def truncateMethodType0(tpe: Type): Type = {
+      tpe match{
+        case pt: PolyType => PolyType(pt.paramInfos, truncateMethodType0(pt.resType))
+        case mt: MethodType => MethodType(mt.paramInfos.take(paramIndex), mt.resType)
+      }
+    }
+
+    val truncatedMethodType = truncateMethodType0(prevMethodType)
 
     val forwarderDefSymbol = Symbols.newSymbol(
       defdef.symbol.owner,
@@ -51,10 +63,15 @@ class UnrollPhaseScala3() extends PluginPhase {
       truncatedMethodType
     )
 
-    val newFirstParamss = firstParamList.take(paramIndex).map(copyParam(_, forwarderDefSymbol))
-    val newRestParamss = otherParamLists.map(_.map(copyParam(_, forwarderDefSymbol)))
+    val updated: List[ParamClause] = paramLists.zipWithIndex.map{ case (ps, i) =>
+      if (i == firstValueParamClauseIndex) ps.take(paramIndex).map(p => copyParam(p.asInstanceOf[ValDef], forwarderDefSymbol))
+      else {
+        if (ps.headOption.exists(_.isInstanceOf[TypeDef])) ps.map(p => copyParam2(p.asInstanceOf[TypeDef], forwarderDefSymbol))
+        else ps.map(p => copyParam(p.asInstanceOf[ValDef], forwarderDefSymbol))
+      }
+    }
 
-    val defaultCalls = for (n <- Range(paramIndex, firstParamList.size)) yield {
+    val defaultCalls = for (n <- Range(paramIndex, paramLists(firstValueParamClauseIndex).size)) yield {
       if (defdef.symbol.isConstructor) {
         ref(defdef.symbol.owner.companionModule)
           .select(DefaultGetterName(defdef.name, n))
@@ -68,13 +85,17 @@ class UnrollPhaseScala3() extends PluginPhase {
     }
 
     val allNewParamTrees =
-      List(newFirstParamss.map(p => ref(p.symbol)) ++ defaultCalls) ++
-      newRestParamss.map(_.map(p => ref(p.symbol)))
+      updated.zipWithIndex.map{case (ps, i) =>
+        if (i == firstValueParamClauseIndex) ps.map(p => ref(p.symbol)) ++ defaultCalls
+        else ps.map(p => ref(p.symbol))
+      }
 
     val forwarderInner: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
 
     val forwarderCall0 = allNewParamTrees.foldLeft[Tree](forwarderInner){
-      case (lhs: Tree, newParams) => Apply(lhs, newParams)
+      case (lhs: Tree, newParams) =>
+        if (newParams.headOption.exists(_.isInstanceOf[TypeTree])) TypeApply(lhs, newParams)
+        else Apply(lhs, newParams)
     }
 
     val forwarderCall =
@@ -84,7 +105,7 @@ class UnrollPhaseScala3() extends PluginPhase {
     val newDefDef = implicitly[Context].typeAssigner.assignType(
       cpy.DefDef(defdef)(
         name = forwarderDefSymbol.name,
-        paramss = List(newFirstParamss) ++ newRestParamss,
+        paramss = updated,
         tpt = defdef.tpt,
         rhs = forwarderCall
       ),
@@ -96,7 +117,6 @@ class UnrollPhaseScala3() extends PluginPhase {
 
   def generateDefForwarders(defdef: DefDef)(using Context) = {
     import dotty.tools.dotc.core.NameOps.isConstructorName
-    val firstParamList :: otherParamLists = defdef.paramss.asInstanceOf[List[List[ValDef]]]
 
     val isCaseCopy =
       defdef.name.toString == "copy" && defdef.symbol.owner.is(CaseClass)
@@ -111,16 +131,19 @@ class UnrollPhaseScala3() extends PluginPhase {
 
     for (annot <- annotated.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
       val Some(Literal(Constant(argName: String))) = annot.argument(0)
-      val startParamIndex = firstParamList.indexWhere(_.name.toString == argName)
+
+      val firstValueParamClauseIndex = defdef.paramss.indexWhere(!_.headOption.exists(_.isInstanceOf[TypeDef]))
+
+      val startParamIndex = defdef.paramss(firstValueParamClauseIndex).indexWhere(_.name.toString == argName)
       if (startParamIndex == -1) sys.error("argument to @Unroll must be the name of a parameter")
 
-      val prevMethodType = defdef.symbol.info.asInstanceOf[MethodType]
-      for (paramIndex <- Range(startParamIndex, firstParamList.size)) yield {
+      val prevMethodType = defdef.symbol.info
+      for (paramIndex <- Range(startParamIndex, defdef.paramss(firstValueParamClauseIndex).size)) yield {
         generateSingleForwarder(
           defdef,
           prevMethodType,
-          firstParamList,
-          otherParamLists,
+          defdef.paramss,
+          firstValueParamClauseIndex,
           paramIndex,
           isCaseApply
         )

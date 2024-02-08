@@ -17,7 +17,9 @@ val scalaVersions = Seq(scala212, scala213, scala3)
 
 object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends Cross.Module[String]{
-  trait InnerScalaModule extends CrossScalaModule with CrossValue
+  trait InnerScalaModule extends CrossScalaModule {
+    def crossValue = UnrollModule.this.crossValue
+  }
 
   trait InnerPublishModule extends InnerScalaModule with PublishModule{
 
@@ -48,6 +50,7 @@ trait UnrollModule extends Cross.Module[String]{
     "classMethod",
     "objectMethod",
     "traitMethod",
+    "genericMethod",
     "curriedMethod",
     "methodWithImplicit",
     "primaryConstructor",
@@ -55,9 +58,10 @@ trait UnrollModule extends Cross.Module[String]{
     "caseclass"
   )
 
+
   object tests extends Cross[Tests](testcases)
 
-  trait Tests extends InnerScalaModule with Cross.Module[String]{
+  trait Tests extends Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
 
     // Different versions of Unrolled.scala
