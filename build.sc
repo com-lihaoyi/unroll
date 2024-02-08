@@ -1,4 +1,4 @@
-import mill._, scalalib._
+import mill._, scalalib._, publish._
 import $ivy.`com.github.lolgab::mill-mima::0.1.0`
 import com.github.lolgab.mill.mima.{CheckDirection, ProblemFilter, Mima}
 import com.github.lolgab.mill.mima.worker.MimaBuildInfo
@@ -16,14 +16,30 @@ val scalaVersions = Seq(scala212, scala213, scala3)
 
 
 object unroll extends Cross[UnrollModule](scalaVersions)
-trait UnrollModule extends CrossScalaModule {
-  def ivyDeps = T{
-    if (scalaVersion().startsWith("2.")) Agg(ivy"org.scala-lang:scala-compiler:${scalaVersion()}")
-    else  Agg(ivy"org.scala-lang:scala3-compiler_3:${scalaVersion()}")
+trait UnrollModule extends Cross.Module[String]{
+  trait InnerScalaModule extends CrossScalaModule with CrossValue
+
+  trait InnerPublishModule extends InnerScalaModule with PublishModule{
+
+    def publishVersion = "0.1.0-M1"
+
+    def pomSettings = PomSettings(
+      description = "Main method argument parser for Scala",
+      organization = "com.lihaoyi",
+      url = "https://github.com/com-lihaoyi/unroll",
+      licenses = Seq(License.MIT),
+      versionControl = VersionControl.github("com-lihaoyi", "unroll"),
+      developers = Seq(Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi"))
+    )
   }
 
-  trait InnerScalaModule extends ScalaModule{
-    def scalaVersion = UnrollModule.this.scalaVersion()
+  object annotation extends InnerPublishModule
+  object plugin extends InnerPublishModule{
+    def moduleDeps = Seq(annotation)
+    def ivyDeps = T{
+      if (scalaVersion().startsWith("2.")) Agg(ivy"org.scala-lang:scala-compiler:${scalaVersion()}")
+      else  Agg(ivy"org.scala-lang:scala3-compiler_3:${scalaVersion()}")
+    }
   }
 
   object testutils extends InnerScalaModule
@@ -77,8 +93,8 @@ trait UnrollModule extends CrossScalaModule {
         def moduleDeps = Seq(Unrolled.this, testutils)
       }
 
-      def moduleDeps = Seq(UnrollModule.this)
-      override def scalacPluginClasspath = T{ Agg(UnrollModule.this.jar()) }
+      def moduleDeps = Seq(annotation)
+      override def scalacPluginClasspath = T{ Agg(plugin.jar()) }
 
 //      override def scalaCompilerClasspath = T{
 //        super.scalaCompilerClasspath().filter(!_.toString().contains("scala-compiler")) ++
@@ -86,7 +102,7 @@ trait UnrollModule extends CrossScalaModule {
 //      }
       override def scalacOptions = T{
         Seq(
-          s"-Xplugin:${UnrollModule.this.jar().path}",
+          s"-Xplugin:${plugin.jar().path}",
           "-Xplugin-require:unroll",
           //"-Xprint:all",
           //"-Xprint:typer",
