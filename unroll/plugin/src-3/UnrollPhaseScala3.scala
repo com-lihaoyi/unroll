@@ -115,7 +115,7 @@ class UnrollPhaseScala3() extends PluginPhase {
     newDefDef
   }
 
-  def generateDefForwarders(defdef: DefDef)(using Context) = {
+  def generateDefForwarders(defdef: DefDef)(using Context): Seq[DefDef] = {
     import dotty.tools.dotc.core.NameOps.isConstructorName
 
     val isCaseCopy =
@@ -125,28 +125,30 @@ class UnrollPhaseScala3() extends PluginPhase {
       defdef.name.toString == "apply" && defdef.symbol.owner.companionClass.is(CaseClass)
 
     val annotated =
-      if (defdef.symbol.isPrimaryConstructor || isCaseCopy) defdef.symbol.owner
-      else if (isCaseApply) defdef.symbol.owner.companionClass
+      if (isCaseCopy) defdef.symbol.owner.primaryConstructor
+      else if (isCaseApply) defdef.symbol.owner.companionClass.primaryConstructor
       else defdef.symbol
 
-    for (annot <- annotated.annotations.find(_.symbol.fullName.toString == "unroll.Unroll")) yield {
-      val Some(Literal(Constant(argName: String))) = annot.argument(0)
+    val firstValueParamClauseIndex = defdef.paramss.indexWhere(!_.headOption.exists(_.isInstanceOf[TypeDef]))
 
-      val firstValueParamClauseIndex = defdef.paramss.indexWhere(!_.headOption.exists(_.isInstanceOf[TypeDef]))
-
-      val startParamIndex = defdef.paramss(firstValueParamClauseIndex).indexWhere(_.name.toString == argName)
-      if (startParamIndex == -1) sys.error("argument to @Unroll must be the name of a parameter")
-
-      val prevMethodType = defdef.symbol.info
-      for (paramIndex <- Range(startParamIndex, defdef.paramss(firstValueParamClauseIndex).size)) yield {
-        generateSingleForwarder(
-          defdef,
-          prevMethodType,
-          defdef.paramss,
-          firstValueParamClauseIndex,
-          paramIndex,
-          isCaseApply
-        )
+    if (firstValueParamClauseIndex == -1) Nil
+    else {
+      annotated
+        .paramSymss(firstValueParamClauseIndex)
+        .indexWhere(_.annotations.exists(_.symbol.fullName.toString == "unroll.Unroll")) match{
+        case -1 => Nil
+        case startParamIndex =>
+          val prevMethodType = defdef.symbol.info
+          for (paramIndex <- Range(startParamIndex, defdef.paramss(firstValueParamClauseIndex).size)) yield {
+            generateSingleForwarder(
+              defdef,
+              prevMethodType,
+              defdef.paramss,
+              firstValueParamClauseIndex,
+              paramIndex,
+              isCaseApply
+            )
+          }
       }
     }
 
@@ -163,7 +165,7 @@ class UnrollPhaseScala3() extends PluginPhase {
         tmpl.parents,
         tmpl.derived,
         tmpl.self,
-        tmpl.body ++ newMethods.flatten.flatten
+        tmpl.body ++ newMethods.flatten
       )
     )
   }
