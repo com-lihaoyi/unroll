@@ -1,5 +1,7 @@
 import mill._, scalalib._, publish._
 import $ivy.`com.github.lolgab::mill-mima::0.1.0`
+import $ivy.`de.tototec::de.tobiasroeser.mill.vcs.version::0.4.0`
+import de.tobiasroeser.mill.vcs.version.VcsVersion
 import com.github.lolgab.mill.mima.{CheckDirection, ProblemFilter, Mima}
 import com.github.lolgab.mill.mima.worker.MimaBuildInfo
 import com.github.lolgab.mill.mima.IncompatibleSignatureProblem
@@ -25,7 +27,7 @@ trait UnrollModule extends Cross.Module[String]{
 
   trait InnerPublishModule extends InnerScalaModule with PublishModule{
 
-    def publishVersion = "0.1.0-M1"
+    def publishVersion = VcsVersion.vcsState().format()
 
     def pomSettings = PomSettings(
       description = "Main method argument parser for Scala",
