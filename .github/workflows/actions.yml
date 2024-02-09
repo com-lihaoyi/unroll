@@ -33,7 +33,7 @@ jobs:
 
 
   publish-sonatype:
-    if: github.repository == 'com-lihaoyi/upickle' && contains(github.ref, 'refs/tags/')
+    if: github.repository == 'com-lihaoyi/unroll' && contains(github.ref, 'refs/tags/')
     needs:
       - test-jvm
     runs-on: ubuntu-latest
