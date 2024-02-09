@@ -17,8 +17,8 @@ val scalaVersions = Seq(scala212, scala213, scala3)
 
 object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends Cross.Module[String]{
-  trait InnerScalaModule extends CrossScalaModule {
-    def crossValue = UnrollModule.this.crossValue
+  trait InnerScalaModule extends ScalaModule {
+    def scalaVersion = UnrollModule.this.crossValue
   }
 
   trait InnerPublishModule extends InnerScalaModule with PublishModule{
@@ -35,7 +35,10 @@ trait UnrollModule extends Cross.Module[String]{
     )
   }
 
-  object annotation extends InnerPublishModule
+  object annotation extends InnerPublishModule{
+
+    this.artifactNameParts
+  }
   object plugin extends InnerPublishModule{
     def moduleDeps = Seq(annotation)
     def ivyDeps = T{
