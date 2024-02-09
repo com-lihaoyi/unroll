@@ -1,16 +1,6 @@
 package unroll
 
-@unroll.Unroll("b")
-case class Unrolled(s: String, n: Int = 1, b: Boolean = true){
+case class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true){
   def foo = s + n + b
 }
-
-
-
-
-
-
-
-
-
 

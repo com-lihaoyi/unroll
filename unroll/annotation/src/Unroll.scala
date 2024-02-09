@@ -1,3 +1,3 @@
 package unroll
 
-class Unroll(starting: String) extends scala.annotation.StaticAnnotation
+class Unroll extends scala.annotation.StaticAnnotation

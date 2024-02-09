@@ -1,8 +1,7 @@
 package unroll
 
 trait Unrolled{
-  @unroll.Unroll("b")
-  def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = s + n + b + l
+  def foo(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = s + n + b + l
 }
 
 

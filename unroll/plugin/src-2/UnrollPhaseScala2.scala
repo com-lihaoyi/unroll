@@ -19,13 +19,8 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     new UnrollTransformer(unit)
   }
 
-  def findUnrollAnnotation(annotations: Seq[Annotation]): List[String] = {
-    annotations.toList.filter(_.tpe =:= typeOf[unroll.Unroll]).flatMap { annot =>
-      annot.tree.children.tail match {
-        case Seq(Literal(Constant(s: String))) => Some(s)
-        case _ => None
-      }
-    }
+  def findUnrollAnnotation(params: Seq[Symbol]): Int = {
+    params.toList.indexWhere(_.annotations.exists(_.tpe =:= typeOf[unroll.Unroll]))
   }
 
   def copyValDef(vd: ValDef) = {
@@ -137,13 +132,10 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     forwarderDef.substituteSymbols(fromSyms, toSyms).asInstanceOf[DefDef]
   }
 
-  def generateDefForwarders(implDef: ImplDef, defdef: DefDef, s: String) = defdef.vparamss match {
+  def generateDefForwarders(implDef: ImplDef, defdef: DefDef, startParamIndex: Int) = defdef.vparamss match {
     case Nil => Nil
     case firstParamList :: otherParamLists =>
-      val startParamIndex = firstParamList.indexWhere(_.name.toString == s)
-      if (startParamIndex == -1) abort("argument to @Unroll must be the name of a parameter")
-
-      for (paramIndex <- Range(startParamIndex, firstParamList.length)) yield {
+      for (paramIndex <- Range(startParamIndex, firstParamList.length).toList) yield {
         generateSingleForwarder(implDef, defdef, paramIndex, firstParamList, otherParamLists)
       }
   }
@@ -154,13 +146,15 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       implDef.impl.body.collect{ case defdef: DefDef =>
 
         val annotated =
-          if (defdef.symbol.isPrimaryConstructor) defdef.symbol.owner
-          else if (defdef.symbol.isCaseApplyOrUnapply && defdef.symbol.name.toString == "apply") defdef.symbol.owner.companionClass
-          else if (defdef.symbol.isCaseCopy && defdef.symbol.name.toString == "copy") defdef.symbol.owner
+          if (defdef.symbol.isCaseCopy && defdef.symbol.name.toString == "copy") defdef.symbol.owner.primaryConstructor
+          else if (defdef.symbol.isCaseApplyOrUnapply && defdef.symbol.name.toString == "apply") defdef.symbol.owner.companionClass.primaryConstructor
           else defdef.symbol
 
-        findUnrollAnnotation(annotated.annotations).flatMap{s =>
-          generateDefForwarders(implDef, defdef, s)
+        annotated.asMethod.paramss.take(1).flatMap{ firstParams =>
+          findUnrollAnnotation(firstParams) match {
+            case -1 => Nil
+            case n => generateDefForwarders(implDef, defdef, n)
+          }
         }
       }
     }
