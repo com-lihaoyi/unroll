@@ -4,3 +4,5 @@ trait Unrolled{
   @unroll.Unroll("b")
   def foo(s: String, n: Int = 1, b: Boolean = true) = s + n + b
 }
+
+object Unrolled extends Unrolled

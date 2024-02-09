@@ -17,8 +17,10 @@ val scalaVersions = Seq(scala212, scala213, scala3)
 
 object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends Cross.Module[String]{
-  trait InnerScalaModule extends ScalaModule {
-    def scalaVersion = UnrollModule.this.crossValue
+  trait InnerScalaModule extends CrossScalaModule {
+    def crossValue = UnrollModule.this.crossValue
+
+    override def artifactNameParts = millModuleSegments.parts.patch(1, Nil, 1)
   }
 
   trait InnerPublishModule extends InnerScalaModule with PublishModule{

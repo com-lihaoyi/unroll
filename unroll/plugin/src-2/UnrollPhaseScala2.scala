@@ -69,7 +69,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
         MethodType(forwarderParams.take(paramIndex), result)
 
       case PolyType(tparams, MethodType(originalParams, result)) =>
-        println(originalParams.map(_.hashCode))
         val forwarderParams = originalParams.map(symbolReplacements)
         PolyType(tparams, MethodType(forwarderParams.take(paramIndex), result))
     }
@@ -127,11 +126,15 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       vparamss = newVParamss,
       tpt = defdef.tpt,
       rhs = forwarderCall
-    ).setSymbol(forwarderDefSymbol)
+    ).set(forwarderDefSymbol)
+
+    // No idea why this `if` guard is necessary, but without it we end
+    if (defdef.symbol.owner.isTrait) {
+      defdef.symbol.owner.info.asInstanceOf[ClassInfoType].decls.enter(forwarderDefSymbol)
+    }
 
     val (fromSyms, toSyms) = symbolReplacements.toList.unzip
     forwarderDef.substituteSymbols(fromSyms, toSyms).asInstanceOf[DefDef]
-
   }
 
   def generateDefForwarders(implDef: ImplDef, defdef: DefDef, s: String) = defdef.vparamss match {

@@ -7,19 +7,8 @@ object UnrollTestMain{
     val unrolled = new Unrolled{}
     logAssertStartsWith(unrolled.foo("cow"), "cow1")
     logAssertStartsWith(unrolled.foo("cow", 2), "cow2")
+
+    logAssertStartsWith(Unrolled.foo("cow"), "cow1")
+    logAssertStartsWith(Unrolled.foo("cow", 2), "cow2")
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
