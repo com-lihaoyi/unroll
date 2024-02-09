@@ -32,18 +32,20 @@ See this original discussion for more context:
 ### Methods
 
 ```scala
+import unroll.Unroll
+
 object Unrolled{
-   @unroll.Unroll("b")
-   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = s + n + b + l
+   def foo(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = s + n + b + l
 }
 ```
 
 Unrolls to:
 
 ```scala
+import unroll.Unroll
+
 object Unrolled{
-   @unroll.Unroll("b")
-   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = s + n + b + l
+   def foo(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = s + n + b + l
 
    def foo(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
    def foo(s: String, n: Int) = foo(s, n, true, 0)
@@ -52,8 +54,9 @@ object Unrolled{
 ### Classes
 
 ```scala
-@unroll.Unroll("b")
-class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
+import unroll.Unroll
+
+class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0){
    def foo = s + n + b + l
 }
 ```
@@ -61,8 +64,9 @@ class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
 Unrolls to:
 
 ```scala
-@unroll.Unroll("b")
-class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
+import unroll.Unroll
+
+class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0){
    def foo = s + n + b + l
 
    def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0)
@@ -73,11 +77,12 @@ class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0){
 ### Constructors
 
 ```scala
+import unroll.Unroll
+
 class Unrolled() {
    var foo = ""
 
-   @unroll.Unroll("b")
-   def this(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = {
+   def this(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = {
       this()
       foo = s + n + b + l
    }
@@ -87,11 +92,12 @@ class Unrolled() {
 Unrolls to:
 
 ```scala
+import unroll.Unroll
+
 class Unrolled() {
    var foo = ""
 
-   @unroll.Unroll("b")
-   def this(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = {
+   def this(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = {
       this()
       foo = s + n + b + l
    }
@@ -104,8 +110,9 @@ class Unrolled() {
 ### Case Classes
 
 ```scala
-@unroll.Unroll("b")
-case class Unrolled(s: String, n: Int = 1, b: Boolean = true){
+import unroll.Unroll
+
+case class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true){
   def foo = s + n + b
 }
 ```
@@ -113,8 +120,9 @@ case class Unrolled(s: String, n: Int = 1, b: Boolean = true){
 Unrolls to:
 
 ```scala
-@unroll.Unroll("b")
-case class Unrolled(s: String, n: Int = 1, b: Boolean = true, l: Long = 0L){
+import unroll.Unroll
+
+case class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0L){
    def this(s: String, n: Int) = this(s, n, true, 0L)
    def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0L)
    
