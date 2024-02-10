@@ -145,15 +145,32 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     def generateDefForwarders2(implDef: ImplDef): List[List[DefDef]] = {
       implDef.impl.body.collect{ case defdef: DefDef =>
 
-        val annotated =
-          if (defdef.symbol.isCaseCopy && defdef.symbol.name.toString == "copy") defdef.symbol.owner.primaryConstructor
-          else if (defdef.symbol.isCaseApplyOrUnapply && defdef.symbol.name.toString == "apply") defdef.symbol.owner.companionClass.primaryConstructor
-          else defdef.symbol
+        val annotatedOpt =
+          if (defdef.symbol.isCaseCopy && defdef.symbol.name.toString == "copy") {
+            Some(defdef.symbol.owner.primaryConstructor)
+          } else if (defdef.symbol.isCaseApplyOrUnapply && defdef.symbol.name.toString == "apply"){
+            val classConstructor = defdef.symbol.owner.companionClass.primaryConstructor
+            if (classConstructor == NoSymbol) None
+            else Some(classConstructor)
+          } else {
+            Some(defdef.symbol)
+          }
 
-        annotated.asMethod.paramss.take(1).flatMap{ firstParams =>
-          findUnrollAnnotation(firstParams) match {
-            case -1 => Nil
-            case n => generateDefForwarders(implDef, defdef, n)
+        // Somehow the "apply" methods of case class companions defined within local scopes
+        // do not have companion class primary constructor symbols, so we just skip them here
+        annotatedOpt.toList.flatMap{ annotated =>
+          try {
+            annotated.asMethod.paramss.take(1).flatMap{ firstParams =>
+              findUnrollAnnotation(firstParams) match {
+                case -1 => Nil
+                case n => generateDefForwarders(implDef, defdef, n)
+              }
+            }
+          }catch{case e: Throwable =>
+            throw new Exception(
+              s"Failed to generate unrolled defs for $defdef in ${implDef.symbol} in ${implDef.symbol.pos}",
+              e
+            )
           }
         }
       }
