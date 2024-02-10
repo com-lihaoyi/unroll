@@ -1,10 +1,18 @@
 # unroll
 
 
-Unroll provides the `@Unroll` annotation that can be applied
-to methods, classes, and constructors. `@Unroll` generates unrolled/telescoping
-versions of the method, starting from the annotated parameter, which
-are simple forwarders to the primary method or constructor implementation.
+Unroll provides the `@Unroll` annotation that can be applied to methods, classes, and
+constructors. `@Unroll` generates unrolled/telescoping versions of the method, starting
+from the annotated parameter, which are simple forwarders to the primary method or 
+constructor implementation. This allows you to maintain binary compatibility when adding
+a new default parameter, without the boilerplate of manually defining forwarder methods.
+
+See the following PRs that demonstrate the usage of `@Unroll` and the binary-compatibility
+boilerplate that can be saved:
+
+- https://github.com/com-lihaoyi/mainargs/pull/113/files
+- https://github.com/com-lihaoyi/mill/pull/3008/files
+- https://github.com/com-lihaoyi/upickle/pull/555/files
 
 In the past, evolving code in Scala while maintaining binary compatibility was a pain.
 You couldn't use default parameters, you couldn't use case classes. Many people fell
