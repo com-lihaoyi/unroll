@@ -1,9 +1,9 @@
 # unroll
 
 
-Unroll provides the `@unroll.Unroll("foo")` annotation that can be applied
+Unroll provides the `@Unroll` annotation that can be applied
 to methods, classes, and constructors. `@Unroll` generates unrolled/telescoping
-versions of the method, starting from the parameter specified by `"foo"`, which
+versions of the method, starting from the annotated parameter, which
 are simple forwarders to the primary method or constructor implementation.
 
 In the past, evolving code in Scala while maintaining binary compatibility was a pain.
