@@ -129,7 +129,7 @@ class UnrollPhaseScala3() extends PluginPhase {
       else if (isCaseApply) defdef.symbol.owner.companionClass.primaryConstructor
       else defdef.symbol
 
-    val firstValueParamClauseIndex = defdef.paramss.indexWhere(!_.headOption.exists(_.isInstanceOf[TypeDef]))
+    val firstValueParamClauseIndex = annotated.paramSymss.indexWhere(!_.headOption.exists(_.isType))
 
     if (firstValueParamClauseIndex == -1) Nil
     else {
