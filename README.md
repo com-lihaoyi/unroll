@@ -1,8 +1,8 @@
 # unroll
 
 
-Unroll provides the `@Unroll` annotation that can be applied to methods, classes, and
-constructors. `@Unroll` generates unrolled/telescoping versions of the method, starting
+Unroll provides an experimental `@Unroll` annotation that can be applied to methods, classes, 
+and constructors. `@Unroll` generates unrolled/telescoping versions of the method, starting
 from the annotated parameter, which are simple forwarders to the primary method or 
 constructor implementation. This allows you to maintain binary compatibility when adding
 a new default parameter, without the boilerplate of manually defining forwarder methods.
