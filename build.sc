@@ -1,4 +1,4 @@
-import mill._, scalalib._, publish._
+import mill._, scalalib._, publish._, scalajslib._, scalanativelib._
 import $ivy.`com.github.lolgab::mill-mima::0.1.0`
 import $ivy.`de.tototec::de.tobiasroeser.mill.vcs.version::0.4.0`
 import de.tobiasroeser.mill.vcs.version.VcsVersion
@@ -21,8 +21,15 @@ object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends Cross.Module[String]{
   trait InnerScalaModule extends CrossScalaModule {
     def crossValue = UnrollModule.this.crossValue
+    override def artifactNameParts: T[Seq[String]] = millModuleSegments.parts.patch(1, Nil, 1)
+  }
 
-    override def artifactNameParts = millModuleSegments.parts.patch(1, Nil, 1)
+  trait InnerScalaJsModule extends InnerScalaModule with ScalaJSModule{
+    def scalaJSVersion = "1.13.1"
+  }
+
+  trait InnerScalaNativeModule extends InnerScalaModule with ScalaNativeModule{
+    def scalaNativeVersion = "0.4.14"
   }
 
   trait InnerPublishModule extends InnerScalaModule with PublishModule{
@@ -39,10 +46,7 @@ trait UnrollModule extends Cross.Module[String]{
     )
   }
 
-  object annotation extends InnerPublishModule{
-
-    this.artifactNameParts
-  }
+  object annotation extends InnerPublishModule
   object plugin extends InnerPublishModule{
     def moduleDeps = Seq(annotation)
     def ivyDeps = T{
@@ -71,58 +75,95 @@ trait UnrollModule extends Cross.Module[String]{
   trait Tests extends Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
 
+    trait CrossPlatformModule extends Module{
+      def mimaPrevious = Seq.empty[CrossPlatformModule]
+      trait Unrolled extends InnerScalaModule with LocalMimaModule with PlatformScalaModule{
+        def moduleDeps = Seq(annotation)
+        def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
+        def mimaPreviousArtifacts = T.traverse(mimaPrevious)(_.jvm.jar)()
+        override def scalacPluginClasspath = T{ Agg(plugin.jar()) }
+
+        //      override def scalaCompilerClasspath = T{
+        //        super.scalaCompilerClasspath().filter(!_.toString().contains("scala-compiler")) ++
+        //        Agg(PathRef(os.Path("/Users/lihaoyi/.ivy2/local/org.scala-lang/scala-compiler/2.13.12-bin-SNAPSHOT/jars/scala-compiler.jar")))
+        //      }
+        override def scalacOptions = T{
+          Seq(
+            s"-Xplugin:${plugin.jar().path}",
+            "-Xplugin-require:unroll",
+            //"-Xprint:all",
+            //"-Xprint:typer",
+            //"-Xprint:unroll",
+            //"-Xprint:patmat",
+            //"-Xprint:superaccessors"
+          )
+        }
+        trait UnrolledTestModule extends InnerScalaModule{
+          def sources = super.sources() ++ testutils.sources()
+          def moduleDeps = Seq(Unrolled.this)
+          def mainClass = Some("unroll.UnrollTestMain")
+        }
+      }
+
+      object jvm extends InnerScalaModule with Unrolled{
+        object test extends UnrolledTestModule
+      }
+      object js extends InnerScalaJsModule with Unrolled{
+        object test extends UnrolledTestModule with InnerScalaJsModule
+      }
+      object native extends InnerScalaNativeModule with Unrolled{
+        object test extends UnrolledTestModule with InnerScalaNativeModule
+      }
+    }
     // Different versions of Unrolled.scala
-    object v3 extends Unrolled {
-      def mimaPreviousArtifacts = Seq(v1.jar(), v2.jar())
+    object v3 extends CrossPlatformModule {
+      def mimaPrevious = Seq(v1, v2)
     }
-    object v2 extends Unrolled {
-      def mimaPreviousArtifacts = Seq(v1.jar())
+    object v2 extends CrossPlatformModule {
+      def mimaPrevious = Seq(v1)
     }
-    object v1 extends Unrolled{
-      def mimaPreviousArtifacts = Seq[PathRef]()
+    object v1 extends CrossPlatformModule{
+      def mimaPrevious = Seq()
     }
 
     // proxy modules used to make sure old versions of UnrolledTestMain.scala can
     // successfully call newer versions of the Unrolled.scala
-    trait ComparativeScalaModule extends InnerScalaModule{
-      def mainClass = Some("unroll.UnrollTestMain")
-    }
+    trait ComparativeModule extends Module{
+      def upstream: CrossPlatformModule
+      def upstreamTest: CrossPlatformModule
 
-    object v2v3 extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(v2.test.jar(), v3.jar(), testutils.jar())
-    }
-    object v1v3 extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(v1.test.jar(), v3.jar(), testutils.jar())
-    }
-    object v1v2 extends ComparativeScalaModule{
-      def unmanagedClasspath = Agg(v1.test.jar(), v2.jar(), testutils.jar())
-    }
-
-    trait Unrolled extends InnerScalaModule with LocalMimaModule {
-      override def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
-      object test extends InnerScalaModule{
-        def moduleDeps = Seq(Unrolled.this, testutils)
+      trait ComparativePlatformScalaModule extends PlatformScalaModule{
+        def sources = super.sources() ++ testutils.sources()
+        def mainClass = Some("unroll.UnrollTestMain")
       }
 
-      def moduleDeps = Seq(annotation)
-      override def scalacPluginClasspath = T{ Agg(plugin.jar()) }
+      object jvm extends InnerScalaModule with ComparativePlatformScalaModule{
+        def unmanagedClasspath = Agg(upstreamTest.jvm.test.jar(), upstream.jvm.jar())
+      }
 
-//      override def scalaCompilerClasspath = T{
-//        super.scalaCompilerClasspath().filter(!_.toString().contains("scala-compiler")) ++
-//        Agg(PathRef(os.Path("/Users/lihaoyi/.ivy2/local/org.scala-lang/scala-compiler/2.13.12-bin-SNAPSHOT/jars/scala-compiler.jar")))
-//      }
-      override def scalacOptions = T{
-        Seq(
-          s"-Xplugin:${plugin.jar().path}",
-          "-Xplugin-require:unroll",
-          //"-Xprint:all",
-          //"-Xprint:typer",
-          //"-Xprint:unroll",
-          //"-Xprint:patmat",
-          //"-Xprint:superaccessors"
-        )
+      object js extends InnerScalaJsModule with ComparativePlatformScalaModule{
+        def unmanagedClasspath = Agg(upstreamTest.js.test.jar(), upstream.js.jar())
+      }
+
+      object native extends InnerScalaNativeModule with ComparativePlatformScalaModule{
+        def unmanagedClasspath = Agg(upstreamTest.native.test.jar(), upstream.native.jar())
       }
     }
+
+    object v2v3 extends ComparativeModule{
+      def upstream = v3
+      def upstreamTest = v2
+
+    }
+    object v1v3 extends ComparativeModule{
+      def upstream = v3
+      def upstreamTest = v1
+    }
+    object v1v2 extends ComparativeModule{
+      def upstream = v2
+      def upstreamTest = v1
+    }
+
 
     def moduleDeps = Seq(v3)
   }
