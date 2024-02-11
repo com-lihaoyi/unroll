@@ -1,0 +1,3 @@
+object UnrollTestScalaSpecific{
+  def test() = {}
+}

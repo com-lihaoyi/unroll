@@ -101,7 +101,7 @@ trait UnrollModule extends Cross.Module[String]{
             //"-Xprint:superaccessors"
           )
         }
-        trait UnrolledTestModule extends InnerScalaModule{
+        trait UnrolledTestModule extends InnerScalaModule with CrossScalaModule {
           def sources = super.sources() ++ testutils.sources()
           def moduleDeps = Seq(Unrolled.this)
           def mainClass = Some("unroll.UnrollTestMain")

@@ -27,6 +27,7 @@ object UnrollTestMain{
     assert(b == true)
     assert(l == 0L)
 
+    UnrollTestScalaSpecific.test()
   }
 }
 

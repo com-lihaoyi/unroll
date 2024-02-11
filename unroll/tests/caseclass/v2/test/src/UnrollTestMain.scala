@@ -23,6 +23,8 @@ object UnrollTestMain{
     assert(s == "cow")
     assert(n == 1)
     assert(b == true)
+
+    UnrollTestScalaSpecific.test()
   }
 }
 
