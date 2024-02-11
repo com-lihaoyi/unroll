@@ -152,7 +152,7 @@ class UnrollPhaseScala3() extends PluginPhase {
     ).setDefTree
   }
 
-  def transformBodyTree(tree: Tree)(using Context): Seq[Tree] = tree match{
+  def generateSyntheticDefs(tree: Tree)(using Context): Seq[Tree] = tree match{
     case defdef: DefDef if defdef.paramss.nonEmpty =>
       import dotty.tools.dotc.core.NameOps.isConstructorName
 
@@ -172,7 +172,7 @@ class UnrollPhaseScala3() extends PluginPhase {
 
       val firstValueParamClauseIndex = annotated.paramSymss.indexWhere(!_.headOption.exists(_.isType))
 
-      if (firstValueParamClauseIndex == -1) Seq(defdef)
+      if (firstValueParamClauseIndex == -1) Nil
       else {
         val paramCount = annotated.paramSymss(firstValueParamClauseIndex).size
         annotated
@@ -208,8 +208,8 @@ class UnrollPhaseScala3() extends PluginPhase {
         tmpl.derived,
         tmpl.self,
         tmpl.body.filter(!this.isCaseFromProduct(_)) ++
-        tmpl.body.flatMap(transformBodyTree) ++
-        transformBodyTree(tmpl.constr)
+        tmpl.body.flatMap(generateSyntheticDefs) ++
+        generateSyntheticDefs(tmpl.constr)
       )
     )
   }
