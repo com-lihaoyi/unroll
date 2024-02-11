@@ -1,4 +1,4 @@
-# unroll
+# @Unroll
 
 
 Unroll provides an experimental `@Unroll` annotation that can be applied to methods, classes, 
@@ -145,6 +145,37 @@ object Unrolled{
 }
 ```
 
+### Abstract Methods
+
+```scala
+import unroll.Unroll
+
+trait Unrolled{
+  def foo(s: String, n: Int = 1, @Unroll b: Boolean = true): String
+}
+
+object Unrolled extends Unrolled{
+  def foo(s: String, n: Int = 1, b: Boolean = true) = s + n + b
+}
+```
+
+Unrolls to:
+
+```scala
+trait Unrolled{
+  def foo(s: String, n: Int = 1, @Unroll b: Boolean = true): String
+  def foo(s: String, n: Int = 1): String = foo(s, n, true)
+}
+
+object Unrolled extends Unrolled{
+  def foo(s: String, n: Int = 1, b: Boolean = true) = s + n + b
+}
+```
+
+Note that only the abstract method needs to be `@Unroll`ed, as the generated forwarder
+methods are concrete. The concrete implementation `class` or `object` does not need to 
+`@Unroll` its implementation method, as it only needs to implement the abstract `@Unroll`ed
+method and not the concrete forwarders.
 
 ## Limitations
 

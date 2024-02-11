@@ -66,7 +66,9 @@ trait UnrollModule extends Cross.Module[String]{
     "methodWithImplicit",
     "primaryConstructor",
     "secondaryConstructor",
-    "caseclass"
+    "caseclass",
+    "abstractTraitMethod",
+    "abstractClassMethod"
   )
 
 
