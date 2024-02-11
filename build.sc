@@ -103,21 +103,24 @@ trait UnrollModule extends Cross.Module[String]{
             //"-Xprint:superaccessors"
           )
         }
-        trait UnrolledTestModule extends InnerScalaModule with CrossScalaModule {
+        trait UnrolledTestModule extends ScalaModule {
           def sources = super.sources() ++ testutils.sources()
           def moduleDeps = Seq(Unrolled.this)
           def mainClass = Some("unroll.UnrollTestMain")
+          def testFramework = T{ "" } // stub
         }
       }
 
       object jvm extends InnerScalaModule with Unrolled{
-        object test extends UnrolledTestModule
+        object test extends ScalaTests with UnrolledTestModule{
+
+        }
       }
       object js extends InnerScalaJsModule with Unrolled{
-        object test extends UnrolledTestModule with InnerScalaJsModule
+        object test extends ScalaJSTests with UnrolledTestModule
       }
       object native extends InnerScalaNativeModule with Unrolled{
-        object test extends UnrolledTestModule with InnerScalaNativeModule
+        object test extends ScalaNativeTests with UnrolledTestModule
       }
     }
     // Different versions of Unrolled.scala

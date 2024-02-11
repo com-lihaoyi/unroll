@@ -4,6 +4,8 @@ import unroll.TestUtils.logAssertStartsWith
 
 object UnrollTestMain{
   def main(args: Array[String]): Unit = {
+    UnrollTestPlatformSpecific()
+    
     val unrolled = new Unrolled{}
     logAssertStartsWith(unrolled.foo("cow"), "cow1true0")
     logAssertStartsWith(unrolled.foo("cow", 2), "cow2true0")

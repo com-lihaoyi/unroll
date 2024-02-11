@@ -1,5 +1,5 @@
 package unroll
 
 object UnrollTestScalaSpecific{
-  def test() = {}
+  def apply() = {}
 }

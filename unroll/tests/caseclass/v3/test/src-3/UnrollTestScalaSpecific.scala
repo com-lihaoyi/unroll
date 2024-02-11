@@ -1,7 +1,7 @@
 package unroll
 import unroll.TestUtils.logAssertStartsWith
 object UnrollTestScalaSpecific{
-  def test() = {
+  def apply() = {
     val unrolled = Unrolled.fromProduct(
       new Product {
         def canEqual(that: Any) = true
