@@ -115,49 +115,91 @@ class UnrollPhaseScala3() extends PluginPhase {
     newDefDef
   }
 
-  def generateDefForwarders(defdef: DefDef)(using Context): Seq[DefDef] = {
-    import dotty.tools.dotc.core.NameOps.isConstructorName
-
-    val isCaseCopy =
-      defdef.name.toString == "copy" && defdef.symbol.owner.is(CaseClass)
-
-    val isCaseApply =
-      defdef.name.toString == "apply" && defdef.symbol.owner.companionClass.is(CaseClass)
-
-    val annotated =
-      if (isCaseCopy) defdef.symbol.owner.primaryConstructor
-      else if (isCaseApply) defdef.symbol.owner.companionClass.primaryConstructor
-      else defdef.symbol
-
-    val firstValueParamClauseIndex = annotated.paramSymss.indexWhere(!_.headOption.exists(_.isType))
-
-    if (firstValueParamClauseIndex == -1) Nil
-    else {
-      annotated
-        .paramSymss(firstValueParamClauseIndex)
-        .indexWhere(_.annotations.exists(_.symbol.fullName.toString == "unroll.Unroll")) match{
-        case -1 => Nil
-        case startParamIndex =>
-          val prevMethodType = defdef.symbol.info
-          for (paramIndex <- Range(startParamIndex, defdef.paramss(firstValueParamClauseIndex).size)) yield {
-            generateSingleForwarder(
-              defdef,
-              prevMethodType,
-              defdef.paramss,
-              firstValueParamClauseIndex,
-              paramIndex,
-              isCaseApply
-            )
-          }
-      }
-    }
-
+  def isCaseFromProduct(t: Tree)(using Context) = t match{
+    case defdef: DefDef => defdef.name.toString == "fromProduct" && defdef.symbol.owner.companionClass.is(CaseClass)
+    case _ => false
   }
+
+  def generateFromProduct(startParamIndex: Int, paramCount: Int, defdef: DefDef)(using Context) = {
+    cpy.DefDef(defdef)(
+      name = defdef.name,
+      paramss = defdef.paramss,
+      tpt = defdef.tpt,
+      rhs = Match(
+        ref(defdef.paramss.head.head.asInstanceOf[ValDef].symbol).select(termName("productArity")),
+        Range(startParamIndex, paramCount).toList.map { paramIndex =>
+          val Apply(select, args) = defdef.rhs
+          CaseDef(
+            Literal(Constant(paramIndex)),
+            EmptyTree,
+            Apply(
+              select,
+              args.take(paramIndex) ++
+                Range(paramIndex, paramCount).map(n =>
+                  ref(defdef.symbol.owner.companionModule)
+                    .select(DefaultGetterName(defdef.symbol.owner.primaryConstructor.name.toTermName, n))
+                )
+            )
+          )
+        } ++ Seq(
+          CaseDef(
+            EmptyTree,
+            EmptyTree,
+            defdef.rhs
+          )
+        )
+      )
+    ).setDefTree
+  }
+
+  def transformBodyTree(tree: Tree)(using Context): Seq[Tree] = tree match{
+    case defdef: DefDef if defdef.paramss.nonEmpty =>
+      import dotty.tools.dotc.core.NameOps.isConstructorName
+
+      val isCaseCopy =
+        defdef.name.toString == "copy" && defdef.symbol.owner.is(CaseClass)
+
+      val isCaseApply =
+        defdef.name.toString == "apply" && defdef.symbol.owner.companionClass.is(CaseClass)
+
+      val isCaseFromProduct = this.isCaseFromProduct(defdef)
+
+      val annotated =
+        if (isCaseCopy) defdef.symbol.owner.primaryConstructor
+        else if (isCaseApply) defdef.symbol.owner.companionClass.primaryConstructor
+        else if (isCaseFromProduct) defdef.symbol.owner.companionClass.primaryConstructor
+        else defdef.symbol
+
+      val firstValueParamClauseIndex = annotated.paramSymss.indexWhere(!_.headOption.exists(_.isType))
+
+      if (firstValueParamClauseIndex == -1) Seq(defdef)
+      else {
+        val paramCount = annotated.paramSymss(firstValueParamClauseIndex).size
+        annotated
+          .paramSymss(firstValueParamClauseIndex)
+          .indexWhere(_.annotations.exists(_.symbol.fullName.toString == "unroll.Unroll")) match{
+          case -1 => Nil
+          case startParamIndex =>
+            if (isCaseFromProduct) {
+              Seq(generateFromProduct(startParamIndex, paramCount, defdef))
+            } else {
+              for (paramIndex <- Range(startParamIndex, paramCount)) yield {
+                generateSingleForwarder(
+                  defdef,
+                  defdef.symbol.info,
+                  defdef.paramss,
+                  firstValueParamClauseIndex,
+                  paramIndex,
+                  isCaseApply
+                )
+            }
+          }
+        }
+    }
+    case _ => Nil
+  }
+
   override def transformTemplate(tmpl: tpd.Template)(using Context): tpd.Tree = {
-
-    def potentialDefDefs = (tmpl.body ++ Seq(tmpl.constr)).collect{ case defdef: DefDef if defdef.paramss.nonEmpty => defdef }
-
-    val newMethods = potentialDefDefs.map(generateDefForwarders)
 
     super.transformTemplate(
       cpy.Template(tmpl)(
@@ -165,7 +207,9 @@ class UnrollPhaseScala3() extends PluginPhase {
         tmpl.parents,
         tmpl.derived,
         tmpl.self,
-        tmpl.body ++ newMethods.flatten
+        tmpl.body.filter(!this.isCaseFromProduct(_)) ++
+        tmpl.body.flatMap(transformBodyTree) ++
+        transformBodyTree(tmpl.constr)
       )
     )
   }
