@@ -172,7 +172,7 @@ class UnrollPhaseScala3() extends PluginPhase {
         val paramCount = annotated.paramSymss(firstValueParamClauseIndex).size
         annotated
           .paramSymss(firstValueParamClauseIndex)
-          .indexWhere(_.annotations.exists(_.symbol.fullName.toString == "unroll.Unroll")) match{
+          .indexWhere(_.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll")) match{
           case -1 => (None, Nil)
           case startParamIndex =>
             if (isCaseFromProduct) {
@@ -202,6 +202,7 @@ class UnrollPhaseScala3() extends PluginPhase {
     val (removed0, generatedDefs) = tmpl.body.map(generateSyntheticDefs).unzip
     val (None, generatedConstr) = generateSyntheticDefs(tmpl.constr)
     val removed = removed0.flatten
+
     super.transformTemplate(
       cpy.Template(tmpl)(
         tmpl.constr,

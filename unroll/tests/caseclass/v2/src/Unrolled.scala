@@ -1,5 +1,7 @@
 package unroll
 
-case class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true){
+import scala.annotation.unroll
+
+case class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true){
   def foo = s + n + b
 }

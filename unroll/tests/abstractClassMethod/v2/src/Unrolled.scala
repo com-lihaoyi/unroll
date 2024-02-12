@@ -1,7 +1,9 @@
 package unroll
 
+import scala.annotation.unroll
+
 abstract class Unrolled{
-  def foo(s: String, n: Int = 1, @Unroll b: Boolean = true): String
+  def foo(s: String, n: Int = 1, @unroll b: Boolean = true): String
 }
 
 object Unrolled extends Unrolled{

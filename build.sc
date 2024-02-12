@@ -146,15 +146,15 @@ trait UnrollModule extends Cross.Module[String]{
       }
 
       object jvm extends InnerScalaModule with ComparativePlatformScalaModule{
-        def unmanagedClasspath = Agg(upstreamTest.jvm.test.jar(), upstream.jvm.jar())
+        def unmanagedClasspath = Agg(upstreamTest.jvm.test.compile().classes, upstream.jvm.compile().classes)
       }
 
       object js extends InnerScalaJsModule with ComparativePlatformScalaModule{
-        def unmanagedClasspath = Agg(upstreamTest.js.test.jar(), upstream.js.jar())
+        def unmanagedClasspath = Agg(upstreamTest.js.test.compile().classes, upstream.js.compile().classes)
       }
 
       object native extends InnerScalaNativeModule with ComparativePlatformScalaModule{
-        def unmanagedClasspath = Agg(upstreamTest.native.test.jar(), upstream.native.jar())
+        def unmanagedClasspath = Agg(upstreamTest.native.test.compile().classes, upstream.native.compile().classes)
       }
     }
 

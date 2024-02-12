@@ -20,7 +20,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   }
 
   def findUnrollAnnotation(params: Seq[Symbol]): Int = {
-    params.toList.indexWhere(_.annotations.exists(_.tpe =:= typeOf[unroll.Unroll]))
+    params.toList.indexWhere(_.annotations.exists(_.tpe =:= typeOf[scala.annotation.unroll]))
   }
 
   def copyValDef(vd: ValDef) = {

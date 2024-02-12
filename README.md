@@ -1,13 +1,13 @@
-# @Unroll
+# @unroll
 
 
-Unroll provides an experimental `@Unroll` annotation that can be applied to methods, classes, 
-and constructors. `@Unroll` generates unrolled/telescoping versions of the method, starting
+Unroll provides an experimental `@unroll` annotation that can be applied to methods, classes, 
+and constructors. `@unroll` generates unrolled/telescoping versions of the method, starting
 from the annotated parameter, which are simple forwarders to the primary method or 
 constructor implementation. This allows you to maintain binary compatibility when adding
 a new default parameter, without the boilerplate of manually defining forwarder methods.
 
-See the following PRs that demonstrate the usage of `@Unroll` and the binary-compatibility
+See the following PRs that demonstrate the usage of `@unroll` and the binary-compatibility
 boilerplate that can be saved:
 
 - https://github.com/com-lihaoyi/mainargs/pull/113/files
@@ -26,9 +26,9 @@ it has a default value, all your users would have to recompile all their code. A
 *their* users would need to re-compile all their code, transitively. And so library
 maintainers would suffer so their users could have a smooth upgrading experience.
 
-With `@Unroll`, none of this is a problem anymore. You can add new parameters
+With `@unroll`, none of this is a problem anymore. You can add new parameters
 where-ever you like: method `def`s, `class`es, `case class`es, etc. As long as the
-new parameter has a default value, you can `@Unroll` it to generate the binary-compatibility
+new parameter has a default value, you can `@unroll` it to generate the binary-compatibility
 stub forwarder method automatically. Happy library maintainers, happy users, everyone is happy!
 
 See this original discussion for more context:
@@ -40,20 +40,20 @@ See this original discussion for more context:
 ### Methods
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
 object Unrolled{
-   def foo(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = s + n + b + l
+   def foo(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0) = s + n + b + l
 }
 ```
 
 Unrolls to:
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
 object Unrolled{
-   def foo(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = s + n + b + l
+   def foo(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0) = s + n + b + l
 
    def foo(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
    def foo(s: String, n: Int) = foo(s, n, true, 0)
@@ -62,9 +62,9 @@ object Unrolled{
 ### Classes
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
-class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0){
+class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0){
    def foo = s + n + b + l
 }
 ```
@@ -72,9 +72,9 @@ class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0){
 Unrolls to:
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
-class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0){
+class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0){
    def foo = s + n + b + l
 
    def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0)
@@ -85,12 +85,12 @@ class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0){
 ### Constructors
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
 class Unrolled() {
    var foo = ""
 
-   def this(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = {
+   def this(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0) = {
       this()
       foo = s + n + b + l
    }
@@ -100,12 +100,12 @@ class Unrolled() {
 Unrolls to:
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
 class Unrolled() {
    var foo = ""
 
-   def this(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0) = {
+   def this(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0) = {
       this()
       foo = s + n + b + l
    }
@@ -118,9 +118,9 @@ class Unrolled() {
 ### Case Classes
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
-case class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true){
+case class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true){
   def foo = s + n + b
 }
 ```
@@ -128,9 +128,9 @@ case class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true){
 Unrolls to:
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
-case class Unrolled(s: String, n: Int = 1, @Unroll b: Boolean = true, l: Long = 0L){
+case class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0L){
    def this(s: String, n: Int) = this(s, n, true, 0L)
    def this(s: String, n: Int, b: Boolean) = this(s, n, b, 0L)
    
@@ -148,10 +148,10 @@ object Unrolled{
 ### Abstract Methods
 
 ```scala
-import unroll.Unroll
+import scala.annotation.unroll
 
 trait Unrolled{
-  def foo(s: String, n: Int = 1, @Unroll b: Boolean = true): String
+  def foo(s: String, n: Int = 1, @unroll b: Boolean = true): String
 }
 
 object Unrolled extends Unrolled{
@@ -163,7 +163,7 @@ Unrolls to:
 
 ```scala
 trait Unrolled{
-  def foo(s: String, n: Int = 1, @Unroll b: Boolean = true): String
+  def foo(s: String, n: Int = 1, @unroll b: Boolean = true): String
   def foo(s: String, n: Int = 1): String = foo(s, n, true)
 }
 
@@ -172,9 +172,9 @@ object Unrolled extends Unrolled{
 }
 ```
 
-Note that only the abstract method needs to be `@Unroll`ed, as the generated forwarder
+Note that only the abstract method needs to be `@unroll`ed, as the generated forwarder
 methods are concrete. The concrete implementation `class` or `object` does not need to 
-`@Unroll` its implementation method, as it only needs to implement the abstract `@Unroll`ed
+`@unroll` its implementation method, as it only needs to implement the abstract `@unroll`ed
 method and not the concrete forwarders.
 
 ## Limitations
