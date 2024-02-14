@@ -49,7 +49,7 @@ class UnrollPhaseScala3() extends PluginPhase {
 
     def truncateMethodType0(tpe: Type): Type = {
       tpe match{
-        case pt: PolyType => PolyType(pt.paramInfos, truncateMethodType0(pt.resType))
+        case pt: PolyType => PolyType(pt.paramNames, pt.paramInfos, truncateMethodType0(pt.resType))
         case mt: MethodType => MethodType(mt.paramInfos.take(paramIndex), mt.resType)
       }
     }
