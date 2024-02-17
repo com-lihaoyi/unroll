@@ -60,15 +60,16 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       }
     }
 
-    val forwarderMethodType = defdef.symbol.tpe match{
+    def forwarderMethodType0(t: Type, n: Int): Type = t match{
       case MethodType(originalParams, result) =>
         val forwarderParams = originalParams.map(symbolReplacements)
-        MethodType(forwarderParams.take(paramIndex), result)
+        if (n == annotatedParamListIndex) MethodType(forwarderParams.take(paramIndex), result)
+        else MethodType(forwarderParams, forwarderMethodType0(result, n + 1))
 
-      case PolyType(tparams, MethodType(originalParams, result)) =>
-        val forwarderParams = originalParams.map(symbolReplacements)
-        PolyType(tparams, MethodType(forwarderParams.take(paramIndex), result))
+      case PolyType(tparams, res) => PolyType(tparams, forwarderMethodType0(res, n))
     }
+
+    val forwarderMethodType = forwarderMethodType0(defdef.symbol.tpe, 0)
 
     forwarderDefSymbol.setInfo(forwarderMethodType)
 
@@ -80,24 +81,14 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       }
       .map(_.map(copyValDef))
 
-    val defaultCalls = Range(paramIndex, paramLists(annotatedParamListIndex).size).map{n =>
-      val mangledName = defdef.name.toString + "$default$" + (n + 1)
 
-      val defaultOwner =
-        if (defdef.symbol.isConstructor) implDef.symbol.companionModule
-        else implDef.symbol
-
-      val defaultMember = defaultOwner.tpe.member(TermName(scala.reflect.NameTransformer.encode(mangledName)))
-      Ident(mangledName).setSymbol(defaultMember).set(defaultMember)
-    }
+    val defaultOffset = paramLists
+      .iterator
+      .take(annotatedParamListIndex)
+      .map(_.size)
+      .sum
 
     val forwardedValueParams = newParamLists(annotatedParamListIndex).map(p => Ident(p.name).set(p.symbol))
-
-    val forwarderThis = This(defdef.symbol.owner).set(defdef.symbol.owner)
-
-    val forwarderInner =
-      if (defdef.symbol.isConstructor) Super(forwarderThis, typeNames.EMPTY).set(defdef.symbol.owner)
-      else forwarderThis
 
     val nestedForwarderMethodTypes = Seq
       .iterate(defdef.symbol.tpe, defdef.vparamss.length + 1){
@@ -106,10 +97,32 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       }
       .drop(1)
 
+    val defaultCalls = Range(paramIndex, paramLists(annotatedParamListIndex).size).map{n =>
+      val mangledName = defdef.name.toString + "$default$" + (defaultOffset + n + 1)
+
+      val defaultOwner =
+        if (defdef.symbol.isConstructor) implDef.symbol.companionModule
+        else implDef.symbol
+
+      val defaultMember = defaultOwner.tpe.member(TermName(scala.reflect.NameTransformer.encode(mangledName)))
+      newParamLists.take(annotatedParamListIndex).map(_.map( p => Ident(p.name).set(p.symbol)))
+        .zip(nestedForwarderMethodTypes)
+        .foldLeft(Ident(mangledName).setSymbol(defaultMember).set(defaultMember).set(defaultMember): Tree) {
+          case (lhs, (ps, methodType)) => Apply(fun = lhs, args = ps).setType(methodType)
+        }
+
+    }
+
     val forwarderCallArgs = newParamLists.zipWithIndex.map{case (v, i) =>
       if (i == annotatedParamListIndex) forwardedValueParams ++ defaultCalls
       else v.map( p => Ident(p.name).set(p.symbol))
     }
+
+    val forwarderThis = This(defdef.symbol.owner).set(defdef.symbol.owner)
+
+    val forwarderInner =
+      if (defdef.symbol.isConstructor) Super(forwarderThis, typeNames.EMPTY).set(defdef.symbol.owner)
+      else forwarderThis
 
     val forwarderCall0 = forwarderCallArgs
       .zip(nestedForwarderMethodTypes)

@@ -40,6 +40,7 @@ class UnrollPhaseScala3() extends PluginPhase {
     )
   }
 
+  def isTypeClause(p: ParamClause) = p.headOption.exists(_.isInstanceOf[TypeDef])
   def generateSingleForwarder(defdef: DefDef,
                               prevMethodType: Type,
                               paramIndex: Int,
@@ -48,14 +49,16 @@ class UnrollPhaseScala3() extends PluginPhase {
                               isCaseApply: Boolean)
                              (using Context) = {
 
-    def truncateMethodType0(tpe: Type): Type = {
+    def truncateMethodType0(tpe: Type, n: Int): Type = {
       tpe match{
-        case pt: PolyType => PolyType(pt.paramNames, pt.paramInfos, truncateMethodType0(pt.resType))
-        case mt: MethodType => MethodType(mt.paramInfos.take(paramIndex), mt.resType)
+        case pt: PolyType => PolyType(pt.paramNames, pt.paramInfos, truncateMethodType0(pt.resType, n + 1))
+        case mt: MethodType =>
+          if (n == annotatedParamListIndex) MethodType(mt.paramInfos.take(paramIndex), mt.resType)
+          else MethodType(mt.paramInfos, truncateMethodType0(mt.resType, n + 1))
       }
     }
 
-    val truncatedMethodType = truncateMethodType0(prevMethodType)
+    val truncatedMethodType = truncateMethodType0(prevMethodType, 0)
     val forwarderDefSymbol = Symbols.newSymbol(
       defdef.symbol.owner,
       defdef.name,
@@ -66,22 +69,38 @@ class UnrollPhaseScala3() extends PluginPhase {
     val newParamLists: List[ParamClause] = paramLists.zipWithIndex.map{ case (ps, i) =>
       if (i == annotatedParamListIndex) ps.take(paramIndex).map(p => copyParam(p.asInstanceOf[ValDef], forwarderDefSymbol))
       else {
-        if (ps.headOption.exists(_.isInstanceOf[TypeDef])) ps.map(p => copyParam2(p.asInstanceOf[TypeDef], forwarderDefSymbol))
+        if (isTypeClause(ps)) ps.map(p => copyParam2(p.asInstanceOf[TypeDef], forwarderDefSymbol))
         else ps.map(p => copyParam(p.asInstanceOf[ValDef], forwarderDefSymbol))
       }
     }
 
+    val defaultOffset = paramLists
+      .iterator
+      .take(annotatedParamListIndex)
+      .filter(!isTypeClause(_))
+      .map(_.size)
+      .sum
+
     val defaultCalls = Range(paramIndex, paramLists(annotatedParamListIndex).size).map(n =>
-      if (defdef.symbol.isConstructor) {
+      val inner = if (defdef.symbol.isConstructor) {
         ref(defdef.symbol.owner.companionModule)
-          .select(DefaultGetterName(defdef.name, n))
+          .select(DefaultGetterName(defdef.name, n + defaultOffset))
       } else if (isCaseApply) {
         ref(defdef.symbol.owner.companionModule)
-          .select(DefaultGetterName(termName("<init>"), n))
+          .select(DefaultGetterName(termName("<init>"), n + defaultOffset))
       } else {
         This(defdef.symbol.owner.asClass)
-          .select(DefaultGetterName(defdef.name, n))
+          .select(DefaultGetterName(defdef.name, n + defaultOffset))
       }
+
+      newParamLists
+        .take(annotatedParamListIndex)
+        .map(_.map(p => ref(p.symbol)))
+        .foldLeft[Tree](inner){
+          case (lhs: Tree, newParams) =>
+            if (newParams.headOption.exists(_.isInstanceOf[TypeTree])) TypeApply(lhs, newParams)
+            else Apply(lhs, newParams)
+        }
     )
 
     val forwarderInner: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
