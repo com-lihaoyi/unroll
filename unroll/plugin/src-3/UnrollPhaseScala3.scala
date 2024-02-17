@@ -170,31 +170,43 @@ class UnrollPhaseScala3() extends PluginPhase {
       if (firstValueParamClauseIndex == -1) (None, Nil)
       else {
         val paramCount = annotated.paramSymss(firstValueParamClauseIndex).size
-        val startParamIndices = annotated
-          .paramSymss(firstValueParamClauseIndex)
+        annotated
+          .paramSymss
           .zipWithIndex
-          .collect{
-            case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll") =>
-              i
-          }
-        if (startParamIndices == Nil) (None, Nil)
-        else if (isCaseFromProduct) {
-            (Some(defdef.symbol), Seq(generateFromProduct(startParamIndices, paramCount, defdef)))
-          } else {
+          .map{case (paramClause, paramClauseIndex) =>
             (
-              None,
-
-              for (paramIndex <- startParamIndices) yield {
-                generateSingleForwarder(
-                  defdef,
-                  defdef.symbol.info,
-                  defdef.paramss,
-                  firstValueParamClauseIndex,
-                  paramIndex,
-                  isCaseApply
-                )
-              }
+              paramClauseIndex,
+              paramClause
+                .zipWithIndex
+                .collect {
+                  case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll") =>
+                    i
+                }
             )
+          }
+          .filter{case (paramClauseIndex, annotationIndices) => annotationIndices.nonEmpty } match{
+          case Nil => (None, Nil)
+          case Seq((paramClauseIndex, annotationIndices)) =>
+            if (isCaseFromProduct) {
+              (Some(defdef.symbol), Seq(generateFromProduct(annotationIndices, paramCount, defdef)))
+            } else {
+              (
+                None,
+
+                for (paramIndex <- annotationIndices) yield {
+                  generateSingleForwarder(
+                    defdef,
+                    defdef.symbol.info,
+                    defdef.paramss,
+                    paramClauseIndex,
+                    paramIndex,
+                    isCaseApply
+                  )
+                }
+              )
+            }
+
+          case multiple => sys.error("Cannot have multiple parameter lists containing `@unroll` annotation")
         }
       }
 
