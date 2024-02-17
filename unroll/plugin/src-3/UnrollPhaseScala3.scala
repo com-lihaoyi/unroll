@@ -45,7 +45,8 @@ class UnrollPhaseScala3() extends PluginPhase {
                               paramLists: List[ParamClause],
                               firstValueParamClauseIndex: Int,
                               paramIndex: Int,
-                              isCaseApply: Boolean)(using Context) = {
+                              isCaseApply: Boolean)
+                             (using Context) = {
 
     def truncateMethodType0(tpe: Type): Type = {
       tpe match{
@@ -55,7 +56,6 @@ class UnrollPhaseScala3() extends PluginPhase {
     }
 
     val truncatedMethodType = truncateMethodType0(prevMethodType)
-
     val forwarderDefSymbol = Symbols.newSymbol(
       defdef.symbol.owner,
       defdef.name,
@@ -71,7 +71,7 @@ class UnrollPhaseScala3() extends PluginPhase {
       }
     }
 
-    val defaultCalls = for (n <- Range(paramIndex, paramLists(firstValueParamClauseIndex).size)) yield {
+    val defaultCalls = Range(paramIndex, paramLists(firstValueParamClauseIndex).size).map(n =>
       if (defdef.symbol.isConstructor) {
         ref(defdef.symbol.owner.companionModule)
           .select(DefaultGetterName(defdef.name, n))
@@ -82,7 +82,7 @@ class UnrollPhaseScala3() extends PluginPhase {
         This(defdef.symbol.owner.asClass)
           .select(DefaultGetterName(defdef.name, n))
       }
-    }
+    )
 
     val allNewParamTrees =
       updated.zipWithIndex.map{case (ps, i) =>
@@ -115,14 +115,14 @@ class UnrollPhaseScala3() extends PluginPhase {
     newDefDef
   }
 
-  def generateFromProduct(startParamIndex: Int, paramCount: Int, defdef: DefDef)(using Context) = {
+  def generateFromProduct(startParamIndices: List[Int], paramCount: Int, defdef: DefDef)(using Context) = {
     cpy.DefDef(defdef)(
       name = defdef.name,
       paramss = defdef.paramss,
       tpt = defdef.tpt,
       rhs = Match(
         ref(defdef.paramss.head.head.asInstanceOf[ValDef].symbol).select(termName("productArity")),
-        Range(startParamIndex, paramCount).toList.map { paramIndex =>
+        startParamIndices.map { paramIndex =>
           val Apply(select, args) = defdef.rhs
           CaseDef(
             Literal(Constant(paramIndex)),
@@ -170,30 +170,34 @@ class UnrollPhaseScala3() extends PluginPhase {
       if (firstValueParamClauseIndex == -1) (None, Nil)
       else {
         val paramCount = annotated.paramSymss(firstValueParamClauseIndex).size
-        annotated
+        val startParamIndices = annotated
           .paramSymss(firstValueParamClauseIndex)
-          .indexWhere(_.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll")) match{
-          case -1 => (None, Nil)
-          case startParamIndex =>
-            if (isCaseFromProduct) {
-              (Some(defdef.symbol), Seq(generateFromProduct(startParamIndex, paramCount, defdef)))
-            } else {
-              (
-                None,
-                for (paramIndex <- Range(startParamIndex, paramCount)) yield {
-                  generateSingleForwarder(
-                    defdef,
-                    defdef.symbol.info,
-                    defdef.paramss,
-                    firstValueParamClauseIndex,
-                    paramIndex,
-                    isCaseApply
-                  )
-                }
-              )
+          .zipWithIndex
+          .collect{
+            case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll") =>
+              i
           }
+        if (startParamIndices == Nil) (None, Nil)
+        else if (isCaseFromProduct) {
+            (Some(defdef.symbol), Seq(generateFromProduct(startParamIndices, paramCount, defdef)))
+          } else {
+            (
+              None,
+
+              for (paramIndex <- startParamIndices) yield {
+                generateSingleForwarder(
+                  defdef,
+                  defdef.symbol.info,
+                  defdef.paramss,
+                  firstValueParamClauseIndex,
+                  paramIndex,
+                  isCaseApply
+                )
+              }
+            )
         }
-    }
+      }
+
     case _ => (None, Nil)
   }
 

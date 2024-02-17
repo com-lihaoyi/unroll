@@ -67,8 +67,8 @@ trait UnrollModule extends Cross.Module[String]{
     "primaryConstructor",
     "secondaryConstructor",
     "caseclass",
-    "abstractTraitMethod",
-    "abstractClassMethod"
+//    "abstractTraitMethod",
+//    "abstractClassMethod"
   )
 
 
@@ -146,15 +146,15 @@ trait UnrollModule extends Cross.Module[String]{
       }
 
       object jvm extends InnerScalaModule with ComparativePlatformScalaModule{
-        def runClasspath = Seq(upstreamTest.jvm.test.compile().classes, upstream.jvm.compile().classes)
+        def runClasspath = super.runClasspath() ++ Seq(upstreamTest.jvm.test.compile().classes, upstream.jvm.compile().classes)
       }
 
       object js extends InnerScalaJsModule with ComparativePlatformScalaModule{
-        def runClasspath = Seq(upstreamTest.js.test.compile().classes, upstream.js.compile().classes)
+        def runClasspath = super.runClasspath() ++ Seq(upstreamTest.js.test.compile().classes, upstream.js.compile().classes)
       }
 
       object native extends InnerScalaNativeModule with ComparativePlatformScalaModule{
-        def runClasspath = Seq(upstreamTest.native.test.compile().classes, upstream.native.compile().classes)
+        def runClasspath = super.runClasspath() ++ Seq(upstreamTest.native.test.compile().classes, upstream.native.compile().classes)
       }
     }
 

@@ -10,10 +10,7 @@ object UnrollTestPlatformSpecific{
         "hello1true0"
     )
 
-    assert(
-      cls.getMethod("foo", classOf[Object], classOf[Int]).invoke(instance, "hello", 2: Integer) ==
-        "hello2true0"
-    )
+    assert(scala.util.Try(cls.getMethod("foo", classOf[Object], classOf[Int])).isFailure)
     assert(
       cls.getMethod("foo", classOf[Object], classOf[Int], classOf[Boolean])
         .invoke(instance, "hello", 2: Integer, java.lang.Boolean.FALSE) ==

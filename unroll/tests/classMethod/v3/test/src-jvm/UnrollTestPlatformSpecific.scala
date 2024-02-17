@@ -10,10 +10,10 @@ object UnrollTestPlatformSpecific{
         "hello1true0"
     )
 
-    assert(
-      cls.getMethod("foo", classOf[String], classOf[Int]).invoke(instance, "hello", 2: Integer) ==
-        "hello2true0"
-    )
+    // Only generate unrolled methods for annotated params
+    // (b: Boolean) is not annotated so this method should not exist
+    assert(scala.util.Try(cls.getMethod("foo", classOf[String], classOf[Int])).isFailure)
+
     assert(
       cls.getMethod("foo", classOf[String], classOf[Int], classOf[Boolean])
         .invoke(instance, "hello", 2: Integer, java.lang.Boolean.FALSE) ==
