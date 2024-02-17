@@ -42,9 +42,9 @@ class UnrollPhaseScala3() extends PluginPhase {
 
   def generateSingleForwarder(defdef: DefDef,
                               prevMethodType: Type,
-                              paramLists: List[ParamClause],
-                              firstValueParamClauseIndex: Int,
                               paramIndex: Int,
+                              annotatedParamListIndex: Int,
+                              paramLists: List[ParamClause],
                               isCaseApply: Boolean)
                              (using Context) = {
 
@@ -63,15 +63,15 @@ class UnrollPhaseScala3() extends PluginPhase {
       truncatedMethodType
     )
 
-    val updated: List[ParamClause] = paramLists.zipWithIndex.map{ case (ps, i) =>
-      if (i == firstValueParamClauseIndex) ps.take(paramIndex).map(p => copyParam(p.asInstanceOf[ValDef], forwarderDefSymbol))
+    val newParamLists: List[ParamClause] = paramLists.zipWithIndex.map{ case (ps, i) =>
+      if (i == annotatedParamListIndex) ps.take(paramIndex).map(p => copyParam(p.asInstanceOf[ValDef], forwarderDefSymbol))
       else {
         if (ps.headOption.exists(_.isInstanceOf[TypeDef])) ps.map(p => copyParam2(p.asInstanceOf[TypeDef], forwarderDefSymbol))
         else ps.map(p => copyParam(p.asInstanceOf[ValDef], forwarderDefSymbol))
       }
     }
 
-    val defaultCalls = Range(paramIndex, paramLists(firstValueParamClauseIndex).size).map(n =>
+    val defaultCalls = Range(paramIndex, paramLists(annotatedParamListIndex).size).map(n =>
       if (defdef.symbol.isConstructor) {
         ref(defdef.symbol.owner.companionModule)
           .select(DefaultGetterName(defdef.name, n))
@@ -84,15 +84,15 @@ class UnrollPhaseScala3() extends PluginPhase {
       }
     )
 
-    val allNewParamTrees =
-      updated.zipWithIndex.map{case (ps, i) =>
-        if (i == firstValueParamClauseIndex) ps.map(p => ref(p.symbol)) ++ defaultCalls
+    val forwarderInner: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
+
+    val forwarderCallArgs =
+      newParamLists.zipWithIndex.map{case (ps, i) =>
+        if (i == annotatedParamListIndex) ps.map(p => ref(p.symbol)) ++ defaultCalls
         else ps.map(p => ref(p.symbol))
       }
 
-    val forwarderInner: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
-
-    val forwarderCall0 = allNewParamTrees.foldLeft[Tree](forwarderInner){
+    val forwarderCall0 = forwarderCallArgs.foldLeft[Tree](forwarderInner){
       case (lhs: Tree, newParams) =>
         if (newParams.headOption.exists(_.isInstanceOf[TypeTree])) TypeApply(lhs, newParams)
         else Apply(lhs, newParams)
@@ -102,17 +102,17 @@ class UnrollPhaseScala3() extends PluginPhase {
       if (!defdef.symbol.isConstructor) forwarderCall0
       else Block(List(forwarderCall0), Literal(Constant(())))
 
-    val newDefDef = implicitly[Context].typeAssigner.assignType(
+    val forwarderDef = implicitly[Context].typeAssigner.assignType(
       cpy.DefDef(defdef)(
         name = forwarderDefSymbol.name,
-        paramss = updated,
+        paramss = newParamLists,
         tpt = defdef.tpt,
         rhs = forwarderCall
       ),
       forwarderDefSymbol
     )
 
-    newDefDef
+    forwarderDef
   }
 
   def generateFromProduct(startParamIndices: List[Int], paramCount: Int, defdef: DefDef)(using Context) = {
@@ -165,11 +165,11 @@ class UnrollPhaseScala3() extends PluginPhase {
         else if (isCaseFromProduct) defdef.symbol.owner.companionClass.primaryConstructor
         else defdef.symbol
 
-      val firstValueParamClauseIndex = annotated.paramSymss.indexWhere(!_.headOption.exists(_.isType))
+      val annotatedParamListIndex = annotated.paramSymss.indexWhere(!_.headOption.exists(_.isType))
 
-      if (firstValueParamClauseIndex == -1) (None, Nil)
+      if (annotatedParamListIndex == -1) (None, Nil)
       else {
-        val paramCount = annotated.paramSymss(firstValueParamClauseIndex).size
+        val paramCount = annotated.paramSymss(annotatedParamListIndex).size
         annotated
           .paramSymss
           .zipWithIndex
@@ -197,9 +197,9 @@ class UnrollPhaseScala3() extends PluginPhase {
                   generateSingleForwarder(
                     defdef,
                     defdef.symbol.info,
-                    defdef.paramss,
-                    paramClauseIndex,
                     paramIndex,
+                    paramClauseIndex,
+                    defdef.paramss,
                     isCaseApply
                   )
                 }

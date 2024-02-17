@@ -43,8 +43,8 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   def generateSingleForwarder(implDef: ImplDef,
                               defdef: DefDef,
                               paramIndex: Int,
-                              firstParamList: List[ValDef],
-                              otherParamLists: List[List[ValDef]]) = {
+                              annotatedParamListIndex: Int,
+                              paramLists: List[List[ValDef]]) = {
     val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
     val symbolReplacements = defdef
       .vparamss
@@ -72,12 +72,15 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
     forwarderDefSymbol.setInfo(forwarderMethodType)
 
-    val newVParamss =
-      List(firstParamList.take(paramIndex).map(copyValDef)) ++ otherParamLists.map(_.map(copyValDef))
+    val newParamLists = paramLists
+      .zipWithIndex
+      .map{ case (paramList, i) =>
+        if (i != annotatedParamListIndex) paramList
+        else paramList.take(paramIndex)
+      }
+      .map(_.map(copyValDef))
 
-    val forwardedValueParams = firstParamList.take(paramIndex).map(p => Ident(p.name).set(p.symbol))
-
-    val defaultCalls = Range(paramIndex, firstParamList.size).map{n =>
+    val defaultCalls = Range(paramIndex, paramLists(annotatedParamListIndex).size).map{n =>
       val mangledName = defdef.name.toString + "$default$" + (n + 1)
 
       val defaultOwner =
@@ -87,6 +90,8 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       val defaultMember = defaultOwner.tpe.member(TermName(scala.reflect.NameTransformer.encode(mangledName)))
       Ident(mangledName).setSymbol(defaultMember).set(defaultMember)
     }
+
+    val forwardedValueParams = newParamLists(annotatedParamListIndex).map(p => Ident(p.name).set(p.symbol))
 
     val forwarderThis = This(defdef.symbol.owner).set(defdef.symbol.owner)
 
@@ -101,9 +106,10 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       }
       .drop(1)
 
-    val forwarderCallArgs =
-      Seq(forwardedValueParams ++ defaultCalls) ++
-      newVParamss.tail.map(_.map( p => Ident(p.name).set(p.symbol)))
+    val forwarderCallArgs = newParamLists.zipWithIndex.map{case (v, i) =>
+      if (i == annotatedParamListIndex) forwardedValueParams ++ defaultCalls
+      else v.map( p => Ident(p.name).set(p.symbol))
+    }
 
     val forwarderCall0 = forwarderCallArgs
       .zip(nestedForwarderMethodTypes)
@@ -120,7 +126,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       mods = defdef.mods,
       name = defdef.name,
       tparams = defdef.tparams,
-      vparamss = newVParamss,
+      vparamss = newParamLists,
       tpt = defdef.tpt,
       rhs = forwarderCall
     ).set(forwarderDefSymbol)
@@ -155,19 +161,26 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
         // do not have companion class primary constructor symbols, so we just skip them here
         annotatedOpt.toList.flatMap{ annotated =>
           try {
-            defdef.vparamss match {
+            annotated.tpe.paramss
+              .zipWithIndex
+              .flatMap{case (annotatedParamList, paramListIndex) =>
+                val annotationIndices = findUnrollAnnotations(annotatedParamList)
+                if (annotationIndices.isEmpty) None
+                else Some((annotatedParamList, annotationIndices, paramListIndex))
+              } match{
               case Nil => Nil
-              case firstParamList :: otherParamLists =>
-                val annotations = findUnrollAnnotations(annotated.tpe.params)
-                for (paramIndex <- annotations) yield {
+              case Seq((annotatedParamList, annotationIndices, paramListIndex)) =>
+                for (paramIndex <- annotationIndices) yield {
                   generateSingleForwarder(
                     implDef,
                     defdef,
                     paramIndex,
-                    firstParamList,
-                    otherParamLists
+                    paramListIndex,
+                    defdef.vparamss
                   )
                 }
+
+              case multiple => sys.error("Multiple")
             }
           }catch{case e: Throwable =>
             throw new Exception(
