@@ -210,39 +210,9 @@ trait UnrollModule extends Cross.Module[String]{
     }
 
 
-    object v2v1v1 extends ComparativeModule{
+    object v2v1v2 extends ComparativeModule{
       def upstream = v2
       def downstream = Some(v1)
-      def test = v1
-    }
-    object v2v2v1 extends ComparativeModule{
-      def upstream = v2
-      def downstream = Some(v2)
-      def test = v1
-    }
-    object v3v1v1 extends ComparativeModule{
-      def upstream = v3
-      def downstream = Some(v1)
-      def test = v1
-    }
-    object v3v2v1 extends ComparativeModule{
-      def upstream = v3
-      def downstream = Some(v2)
-      def test = v1
-    }
-    object v3v3v1 extends ComparativeModule{
-      def upstream = v3
-      def downstream = Some(v3)
-      def test = v1
-    }
-    object v3v2v2 extends ComparativeModule{
-      def upstream = v3
-      def downstream = Some(v2)
-      def test = v2
-    }
-    object v3v3v2 extends ComparativeModule{
-      def upstream = v3
-      def downstream = Some(v3)
       def test = v2
     }
 
