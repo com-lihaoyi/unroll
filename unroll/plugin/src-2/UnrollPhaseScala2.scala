@@ -48,10 +48,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                               annotatedParamListIndex: Int,
                               paramLists: List[List[ValDef]]) = {
 
-    println()
-    println("generateSingleForwarder")
-    println("paramIndex " + paramIndex)
-    println("nextParamIndex " + nextParamIndex)
     val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
     val symbolReplacements = defdef
       .vparamss
@@ -78,7 +74,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
     val forwarderMethodType = forwarderMethodType0(defdef.symbol.tpe, 0)
 
-    println("forwarderMethodType " + forwarderMethodType)
     forwarderDefSymbol.setInfo(forwarderMethodType)
 
     val newParamLists = paramLists
@@ -152,12 +147,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       rhs = if (nextParamIndex == -1) EmptyTree else forwarderCall
     ).set(forwarderDefSymbol)
 
-    // No idea why this `if` guard is necessary, but without it we end
-//    if (defdef.symbol.owner.isTrait) {
-//      if ()
-//      defdef.symbol.owner.info.asInstanceOf[ClassInfoType].decls.enter(forwarderDefSymbol)
-//      defdef.symbol.owner.info.asInstanceOf[ClassInfoType].decls.
-//    }
+    // No idea why this `if` guard is necessary, but without it we end up missing
+    // some generated forwarders on trait methods inherited by static objects
+    if (defdef.symbol.owner.isTrait && !defdef.symbol.isAbstract) {
+      defdef.symbol.owner.info.asInstanceOf[ClassInfoType].decls.enter(forwarderDefSymbol)
+    }
 
     val (fromSyms, toSyms) = symbolReplacements.toList.unzip
     forwarderDef.substituteSymbols(fromSyms, toSyms).asInstanceOf[DefDef]
