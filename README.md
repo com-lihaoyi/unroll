@@ -237,3 +237,69 @@ You can also run the following command to run all tests:
 This can be useful as a final sanity check, even though you usually want to run
 a subset of the tests specific to the `scala-version` and `test-case` you are 
 interested in.
+
+```scala
+trait Upstream{
+   def foo(s: String, n: Int = 1)
+}
+```
+```scala
+trait Upstream{
+   // source
+   def foo(s: String, n: Int = 1, @unroll b: Boolean = true)
+   
+   // generated
+   def foo(s: String, n: Int = 1, b: Boolean = true) = foo(s, n)
+   def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b)
+   def fooDown(s: String, n: Int, b: Boolean) = foo(s, n, b)
+   def foo(s: String, n: Int) = foo(s, n, true)
+}
+```
+
+```scala
+trait Upstream{
+   // source
+   def foo(s: String, n: Int = 1, @unroll b: Boolean = true, @unroll l: Long = 0)
+   
+   // generated
+   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = fooDown(s, n, b)
+   def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b, 0) 
+   def fooDown(s: String, n: Int, b: Boolean) = foo(s, n)
+   def foo(s: String, n: Int) = fooUp(s, n, true)
+}
+```
+```scala
+trait Downstream extends Upstream{
+   final def foo(s: String, n: Int = 1) = println(s + n)
+}
+```
+```scala
+trait Downstream extends Upstream{
+   // source
+   def foo(s: String, n: Int = 1, b: Boolean = true) = println(s + n + b)
+   
+   // generated
+   final def foo(s: String, n: Int = 1, b: Boolean = true) = foo(s, n)
+   final def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b)
+   final def fooDown(s: String, n: Int, b: Boolean) = foo(s, n, b)
+ 
+   final def foo(s: String, n: Int) = foo(s, n, true)
+}
+```
+
+```scala
+trait Downstream extends Upstream{
+   // source
+   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0)
+   
+   // generated
+   final def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = fooDown(s, n, b)
+   final def fooUp(s: String, n: Int, b: Boolean, l: Long) = fooDown(s, n, b)
+   final def fooDown(s: String, n: Int, b: Boolean, l: Long) = fooDown(s, n, b)
+
+   final def foo(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
+   final def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
+   final def fooDown(s: String, n: Int, b: Boolean) = foo(s, n)
+   final def foo(s: String, n: Int) = fooUp(s, n, true)
+}
+```

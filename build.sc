@@ -84,13 +84,13 @@ trait UnrollModule extends Cross.Module[String]{
         def moduleDeps = Seq(annotation)
         def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
         def mimaPreviousArtifacts = T.traverse(mimaPrevious)(_.jvm.jar)()
-        override def scalacPluginClasspath = T{ Agg(plugin.jar()) }
+        def scalacPluginClasspath = T{ Agg(plugin.jar()) }
 
         // override def scalaCompilerClasspath = T{
         //   super.scalaCompilerClasspath().filter(!_.toString().contains("scala3-compiler")) ++
         //   Agg(PathRef(os.Path("/Users/lihaoyi/.ivy2/local/org.scala-lang/scala3-compiler_3/3.3.2-RC3-bin-SNAPSHOT/jars/scala3-compiler_3.jar")))
         // }
-        override def scalacOptions = T{
+        def scalacOptions = T{
           Seq(
             s"-Xplugin:${plugin.jar().path}",
             "-Xplugin-require:unroll",
@@ -109,6 +109,7 @@ trait UnrollModule extends Cross.Module[String]{
           def moduleDeps = Seq(Unrolled.this)
           def mainClass = Some("unroll.UnrollTestMain")
           def testFramework = T{ "" } // stub
+          def scalacOptions = Seq.empty[String]
         }
       }
 

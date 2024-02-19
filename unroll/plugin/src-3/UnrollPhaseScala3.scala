@@ -40,10 +40,20 @@ class UnrollPhaseScala3() extends PluginPhase {
     )
   }
 
+  def findUnrollAnnotations(params: List[Symbol])(using Context): List[Int] = {
+    params
+      .zipWithIndex
+      .collect {
+        case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll") =>
+          i
+      }
+  }
   def isTypeClause(p: ParamClause) = p.headOption.exists(_.isInstanceOf[TypeDef])
   def generateSingleForwarder(defdef: DefDef,
                               prevMethodType: Type,
                               paramIndex: Int,
+                              nextParamIndex: Int,
+                              nextSymbol: Symbol,
                               annotatedParamListIndex: Int,
                               paramLists: List[ParamClause],
                               isCaseApply: Boolean)
@@ -81,7 +91,7 @@ class UnrollPhaseScala3() extends PluginPhase {
       .map(_.size)
       .sum
 
-    val defaultCalls = Range(paramIndex, paramLists(annotatedParamListIndex).size).map(n =>
+    val defaultCalls = Range(paramIndex, nextParamIndex).map(n =>
       val inner = if (defdef.symbol.isConstructor) {
         ref(defdef.symbol.owner.companionModule)
           .select(DefaultGetterName(defdef.name, n + defaultOffset))
@@ -103,7 +113,7 @@ class UnrollPhaseScala3() extends PluginPhase {
         }
     )
 
-    val forwarderInner: Tree = This(defdef.symbol.owner.asClass).select(defdef.symbol)
+    val forwarderInner: Tree = This(defdef.symbol.owner.asClass).select(nextSymbol)
 
     val forwarderCallArgs =
       newParamLists.zipWithIndex.map{case (ps, i) =>
@@ -184,49 +194,41 @@ class UnrollPhaseScala3() extends PluginPhase {
         else if (isCaseFromProduct) defdef.symbol.owner.companionClass.primaryConstructor
         else defdef.symbol
 
-      val annotatedParamListIndex = annotated.paramSymss.indexWhere(!_.headOption.exists(_.isType))
 
-      if (annotatedParamListIndex == -1) (None, Nil)
-      else {
-        val paramCount = annotated.paramSymss(annotatedParamListIndex).size
-        annotated
-          .paramSymss
-          .zipWithIndex
-          .map{case (paramClause, paramClauseIndex) =>
+      annotated
+        .paramSymss
+        .zipWithIndex
+        .flatMap{case (paramClause, paramClauseIndex) =>
+          val annotationIndices = findUnrollAnnotations(paramClause)
+          if (annotationIndices.isEmpty) None
+          else Some((paramClauseIndex, annotationIndices))
+        }  match{
+        case Nil => (None, Nil)
+        case Seq((paramClauseIndex, annotationIndices)) =>
+          val paramCount = annotated.paramSymss(paramClauseIndex).size
+          if (isCaseFromProduct) {
+            (Some(defdef.symbol), Seq(generateFromProduct(annotationIndices, paramCount, defdef)))
+          } else {
             (
-              paramClauseIndex,
-              paramClause
-                .zipWithIndex
-                .collect {
-                  case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll") =>
-                    i
-                }
-            )
-          }
-          .filter{case (paramClauseIndex, annotationIndices) => annotationIndices.nonEmpty } match{
-          case Nil => (None, Nil)
-          case Seq((paramClauseIndex, annotationIndices)) =>
-            if (isCaseFromProduct) {
-              (Some(defdef.symbol), Seq(generateFromProduct(annotationIndices, paramCount, defdef)))
-            } else {
-              (
-                None,
-
-                for (paramIndex <- annotationIndices) yield {
-                  generateSingleForwarder(
+              None,
+              (annotationIndices :+ paramCount).sliding(2).toList.reverse.foldLeft((Seq.empty[DefDef], defdef.symbol)){
+                case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
+                  val forwarder = generateSingleForwarder(
                     defdef,
                     defdef.symbol.info,
                     paramIndex,
+                    nextParamIndex,
+                    nextSymbol,
                     paramClauseIndex,
                     defdef.paramss,
                     isCaseApply
                   )
-                }
-              )
-            }
+                  (forwarder +: defdefs, forwarder.symbol)
+              }._1
+            )
+          }
 
-          case multiple => sys.error("Cannot have multiple parameter lists containing `@unroll` annotation")
-        }
+        case multiple => sys.error("Cannot have multiple parameter lists containing `@unroll` annotation")
       }
 
     case _ => (None, Nil)

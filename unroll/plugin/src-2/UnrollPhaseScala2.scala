@@ -43,8 +43,11 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   def generateSingleForwarder(implDef: ImplDef,
                               defdef: DefDef,
                               paramIndex: Int,
+                              nextParamIndex: Int,
+                              nextSymbol: Symbol,
                               annotatedParamListIndex: Int,
                               paramLists: List[List[ValDef]]) = {
+
     val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
     val symbolReplacements = defdef
       .vparamss
@@ -91,13 +94,13 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     val forwardedValueParams = newParamLists(annotatedParamListIndex).map(p => Ident(p.name).set(p.symbol))
 
     val nestedForwarderMethodTypes = Seq
-      .iterate(defdef.symbol.tpe, defdef.vparamss.length + 1){
+      .iterate(nextSymbol.tpe, defdef.vparamss.length + 1){
         case MethodType(args, res) => res
         case PolyType(tparams, MethodType(args, res)) => res
       }
       .drop(1)
 
-    val defaultCalls = Range(paramIndex, paramLists(annotatedParamListIndex).size).map{n =>
+    val defaultCalls = Range(paramIndex, nextParamIndex).map{n =>
       val mangledName = defdef.name.toString + "$default$" + (defaultOffset + n + 1)
 
       val defaultOwner =
@@ -126,7 +129,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
     val forwarderCall0 = forwarderCallArgs
       .zip(nestedForwarderMethodTypes)
-      .foldLeft(Select(forwarderInner, defdef.name).set(defdef.symbol): Tree){
+      .foldLeft(Select(forwarderInner, defdef.name).set(nextSymbol): Tree){
         case (lhs, (ps, methodType)) => Apply(fun = lhs, args = ps).setType(methodType)
       }
 
@@ -183,15 +186,19 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
               } match{
               case Nil => Nil
               case Seq((annotatedParamList, annotationIndices, paramListIndex)) =>
-                for (paramIndex <- annotationIndices) yield {
-                  generateSingleForwarder(
-                    implDef,
-                    defdef,
-                    paramIndex,
-                    paramListIndex,
-                    defdef.vparamss
-                  )
-                }
+                (annotationIndices :+ annotatedParamList.length).sliding(2).toList.reverse.foldLeft((Seq.empty[DefDef], defdef.symbol)){
+                  case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
+                    val forwarderDef =  generateSingleForwarder(
+                      implDef,
+                      defdef,
+                      paramIndex,
+                      nextParamIndex,
+                      nextSymbol,
+                      paramListIndex,
+                      defdef.vparamss
+                    )
+                    (forwarderDef +: defdefs, forwarderDef.symbol)
+                }._1
 
               case multiple => sys.error("Multiple")
             }
