@@ -238,68 +238,62 @@ This can be useful as a final sanity check, even though you usually want to run
 a subset of the tests specific to the `scala-version` and `test-case` you are 
 interested in.
 
+## Upstream
+
 ```scala
-trait Upstream{
+trait Upstream{ // v1
    def foo(s: String, n: Int = 1)
 }
 ```
 ```scala
-trait Upstream{
+trait Upstream{ // v2
    // source
    def foo(s: String, n: Int = 1, @unroll b: Boolean = true)
    
    // generated
    def foo(s: String, n: Int = 1, b: Boolean = true) = foo(s, n)
-   def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b)
-   def fooDown(s: String, n: Int, b: Boolean) = foo(s, n, b)
-   def foo(s: String, n: Int) = foo(s, n, true)
+   def foo(s: String, n: Int)
 }
 ```
 
 ```scala
-trait Upstream{
+trait Upstream{ // v3
    // source
    def foo(s: String, n: Int = 1, @unroll b: Boolean = true, @unroll l: Long = 0)
    
    // generated
    def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = fooDown(s, n, b)
-   def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b, 0) 
-   def fooDown(s: String, n: Int, b: Boolean) = foo(s, n)
-   def foo(s: String, n: Int) = fooUp(s, n, true)
+   def foo(s: String, n: Int, b: Boolean) = foo(s, n)
+   def foo(s: String, n: Int)
 }
 ```
+
+## Downstream
+
 ```scala
-trait Downstream extends Upstream{
+trait Downstream extends Upstream{ // v1 
    final def foo(s: String, n: Int = 1) = println(s + n)
 }
 ```
 ```scala
-trait Downstream extends Upstream{
+trait Downstream extends Upstream{ // v2
    // source
-   def foo(s: String, n: Int = 1, b: Boolean = true) = println(s + n + b)
+   def foo(s: String, n: Int = 1, @unroll b: Boolean = true) = println(s + n + b)
    
    // generated
-   final def foo(s: String, n: Int = 1, b: Boolean = true) = foo(s, n)
-   final def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b)
-   final def fooDown(s: String, n: Int, b: Boolean) = foo(s, n, b)
- 
-   final def foo(s: String, n: Int) = foo(s, n, true)
+   def foo(s: String, n: Int = 1, b: Boolean = true) = println(s + n + b)
+   def foo(s: String, n: Int) = foo(s, n, true)
 }
 ```
 
 ```scala
-trait Downstream extends Upstream{
+trait Downstream extends Upstream{ // v3
    // source
-   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0)
+   def foo(s: String, n: Int = 1, @unroll b: Boolean = true, @unroll l: Long = 0) = println(s + n + b + l)
    
    // generated
-   final def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = fooDown(s, n, b)
-   final def fooUp(s: String, n: Int, b: Boolean, l: Long) = fooDown(s, n, b)
-   final def fooDown(s: String, n: Int, b: Boolean, l: Long) = fooDown(s, n, b)
-
-   final def foo(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
-   final def fooUp(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
-   final def fooDown(s: String, n: Int, b: Boolean) = foo(s, n)
-   final def foo(s: String, n: Int) = fooUp(s, n, true)
+   def foo(s: String, n: Int = 1, b: Boolean = true, l: Long = 0) = println(s + n + b + l)
+   def foo(s: String, n: Int, b: Boolean) = foo(s, n, b, 0)
+   def foo(s: String, n: Int) = foo(s, n, true, 0)
 }
 ```
