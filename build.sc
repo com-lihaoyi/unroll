@@ -68,7 +68,7 @@ trait UnrollModule extends Cross.Module[String]{
     "secondaryConstructor",
     "caseclass",
     "secondParameterList",
-//    "abstractTraitMethod",
+    "abstractTraitMethod",
     "abstractClassMethod"
   )
 
@@ -77,11 +77,30 @@ trait UnrollModule extends Cross.Module[String]{
 
   trait Tests extends Cross.Module[String]{
     override def millSourcePath = super.millSourcePath / crossValue
-
+    trait DownstreamModule extends Module{
+      def jvm: InnerScalaModule
+      def js: InnerScalaJsModule
+      def native: InnerScalaNativeModule
+    }
     trait CrossPlatformModule extends Module{
-      def downstreamOpt: Option[CrossPlatformModule] = None
       def mimaPrevious = Seq.empty[CrossPlatformModule]
       def moduleDeps: Seq[CrossPlatformModule] = Nil
+      object downstream extends DownstreamModule{
+
+        object jvm extends InnerScalaModule with Unrolled{
+          def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
+          def moduleDeps = Seq(CrossPlatformModule.this.jvm)
+        }
+        object js extends InnerScalaJsModule with Unrolled{
+          def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
+          def moduleDeps = Seq(CrossPlatformModule.this.js)
+        }
+        object native extends InnerScalaNativeModule with Unrolled{
+          def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
+          def moduleDeps = Seq(CrossPlatformModule.this.native)
+        }
+      }
+
       trait Unrolled extends InnerScalaModule with LocalMimaModule with PlatformScalaModule{
         def moduleDeps: Seq[JavaModule] = Seq(annotation)
         def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
@@ -117,45 +136,20 @@ trait UnrollModule extends Cross.Module[String]{
       object jvm extends InnerScalaModule with Unrolled{
         def moduleDeps = super.moduleDeps ++ CrossPlatformModule.this.moduleDeps.map(_.jvm.asInstanceOf[Unrolled])
         object test extends ScalaTests with UnrolledTestModule{
-          def moduleDeps = Seq(jvm) ++ downstreamOpt.map(_.jvm.asInstanceOf[Unrolled])
+          def moduleDeps = Seq(jvm, downstream.jvm)
         }
       }
       object js extends InnerScalaJsModule with Unrolled{
         def moduleDeps = super.moduleDeps ++ CrossPlatformModule.this.moduleDeps.map(_.js.asInstanceOf[Unrolled])
         object test extends ScalaJSTests with UnrolledTestModule{
-          def moduleDeps = Seq(js) ++ downstreamOpt.map(_.js.asInstanceOf[Unrolled])
+          def moduleDeps = Seq(js, downstream.js)
         }
       }
       object native extends InnerScalaNativeModule with Unrolled{
         def moduleDeps = super.moduleDeps ++ CrossPlatformModule.this.moduleDeps.map(_.native.asInstanceOf[Unrolled])
         object test extends ScalaNativeTests with UnrolledTestModule{
-          def moduleDeps = Seq(native) ++ downstreamOpt.map(_.native.asInstanceOf[Unrolled])
+          def moduleDeps = Seq(native, downstream.native)
         }
-      }
-    }
-    // Different versions of Unrolled.scala
-
-    object v1 extends CrossPlatformModule{
-      def mimaPrevious = Seq()
-      def downstreamOpt = Some(downstream)
-      object downstream extends CrossPlatformModule{
-        def moduleDeps = Seq(v1)
-      }
-    }
-
-    object v2 extends CrossPlatformModule {
-      def mimaPrevious = Seq(v1)
-      def downstreamOpt = Some(downstream)
-      object downstream extends CrossPlatformModule{
-        def moduleDeps = Seq(v2)
-      }
-    }
-
-    object v3 extends CrossPlatformModule {
-      def mimaPrevious = Seq(v1, v2)
-      def downstreamOpt = Some(downstream)
-      object downstream extends CrossPlatformModule{
-        def moduleDeps = Seq(v3)
       }
     }
 
@@ -163,9 +157,10 @@ trait UnrollModule extends Cross.Module[String]{
     // successfully call newer versions of the Unrolled.scala
     trait ComparativeModule extends Module{
       def upstream: CrossPlatformModule
-      def downstream: Option[CrossPlatformModule] = None
+      def downstream: CrossPlatformModule
       def test: CrossPlatformModule
 
+      def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
       trait ComparativePlatformScalaModule extends PlatformScalaModule{
         def sources = super.sources() ++ testutils.sources()
         def mainClass = Some("unroll.UnrollTestMain")
@@ -174,46 +169,75 @@ trait UnrollModule extends Cross.Module[String]{
       object jvm extends InnerScalaModule with ComparativePlatformScalaModule{
         def runClasspath = 
           super.runClasspath() ++ 
-            Seq(test.jvm.test.compile().classes, upstream.jvm.compile().classes) ++
-            T.traverse(downstream.flatMap(_.downstreamOpt).toSeq)(_.jvm.compile)().map(_.classes)
+            Seq(test.jvm.test.compile().classes, upstream.jvm.compile().classes, downstream.downstream.jvm.compile().classes)
+
       }
 
       object js extends InnerScalaJsModule with ComparativePlatformScalaModule{
         def runClasspath = 
           super.runClasspath() ++ 
-            Seq(test.js.test.compile().classes, upstream.js.compile().classes) ++
-            T.traverse(downstream.flatMap(_.downstreamOpt).toSeq)(_.jvm.compile)().map(_.classes)
+            Seq(test.js.test.compile().classes, upstream.js.compile().classes, downstream.downstream.js.compile().classes)
       }
 
       object native extends InnerScalaNativeModule with ComparativePlatformScalaModule{
-        def runClasspath = 
+        def runClasspath =
           super.runClasspath() ++ 
-            Seq(test.native.test.compile().classes, upstream.native.compile().classes) ++
-            T.traverse(downstream.flatMap(_.downstreamOpt).toSeq)(_.jvm.compile)().map(_.classes)
+            Seq(test.native.test.compile().classes, upstream.native.compile().classes, downstream.downstream.native.compile().classes)
       }
+    }
+
+    // Different versions of Unrolled.scala
+    object v1 extends CrossPlatformModule{
+      def mimaPrevious = Seq()
+    }
+
+    object v2 extends CrossPlatformModule {
+      def mimaPrevious = Seq(v1)
+    }
+
+    object v3 extends CrossPlatformModule {
+      def mimaPrevious = Seq(v1, v2)
     }
 
     object v3v2 extends ComparativeModule{
       def upstream = v3
-      def downstream = Some(v3)
+      def downstream = v3
       def test = v2
     }
     object v3v1 extends ComparativeModule{
       def upstream = v3
-      def downstream = Some(v3)
+      def downstream = v3
       def test = v1
     }
     object v2v1 extends ComparativeModule{
       def upstream = v2
-      def downstream = Some(v2)
+      def downstream = v2
       def test = v1
     }
 
-
     object v2v1v2 extends ComparativeModule{
       def upstream = v2
-      def downstream = Some(v1)
+      def downstream = v1
       def test = v2
+    }
+
+    object v3v1v3 extends ComparativeModule{
+      def upstream = v3
+      def downstream = v1
+      def test = v3
+    }
+
+    object v3v1v2 extends ComparativeModule{
+      def upstream = v3
+      def downstream = v1
+      def test = v2
+    }
+
+
+    object v3v2v3 extends ComparativeModule{
+      def upstream = v3
+      def downstream = v2
+      def test = v3
     }
 
 

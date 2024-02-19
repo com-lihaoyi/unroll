@@ -72,7 +72,7 @@ class UnrollPhaseScala3() extends PluginPhase {
     val forwarderDefSymbol = Symbols.newSymbol(
       defdef.symbol.owner,
       defdef.name,
-      defdef.symbol.flags &~ HasDefaultParams &~ Deferred,
+      defdef.symbol.flags &~ HasDefaultParams &~ (if (nextParamIndex == -1) Flags.EmptyFlags else Deferred),
       truncatedMethodType
     )
 
@@ -117,17 +117,17 @@ class UnrollPhaseScala3() extends PluginPhase {
 
     val forwarderCallArgs =
       newParamLists.zipWithIndex.map{case (ps, i) =>
-        if (i == annotatedParamListIndex) ps.map(p => ref(p.symbol)) ++ defaultCalls
+        if (i == annotatedParamListIndex) ps.map(p => ref(p.symbol)).take(nextParamIndex) ++ defaultCalls
         else ps.map(p => ref(p.symbol))
       }
 
-    val forwarderCall0 = forwarderCallArgs.foldLeft[Tree](forwarderInner){
+    lazy val forwarderCall0 = forwarderCallArgs.foldLeft[Tree](forwarderInner){
       case (lhs: Tree, newParams) =>
         if (newParams.headOption.exists(_.isInstanceOf[TypeTree])) TypeApply(lhs, newParams)
         else Apply(lhs, newParams)
     }
 
-    val forwarderCall =
+    lazy val forwarderCall =
       if (!defdef.symbol.isConstructor) forwarderCall0
       else Block(List(forwarderCall0), Literal(Constant(())))
 
@@ -136,7 +136,7 @@ class UnrollPhaseScala3() extends PluginPhase {
         name = forwarderDefSymbol.name,
         paramss = newParamLists,
         tpt = defdef.tpt,
-        rhs = forwarderCall
+        rhs = if (nextParamIndex == -1) EmptyTree else forwarderCall
       ),
       forwarderDefSymbol
     )
@@ -209,23 +209,45 @@ class UnrollPhaseScala3() extends PluginPhase {
           if (isCaseFromProduct) {
             (Some(defdef.symbol), Seq(generateFromProduct(annotationIndices, paramCount, defdef)))
           } else {
-            (
-              None,
-              (annotationIndices :+ paramCount).sliding(2).toList.reverse.foldLeft((Seq.empty[DefDef], defdef.symbol)){
-                case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
-                  val forwarder = generateSingleForwarder(
-                    defdef,
-                    defdef.symbol.info,
-                    paramIndex,
-                    nextParamIndex,
-                    nextSymbol,
-                    paramClauseIndex,
-                    defdef.paramss,
-                    isCaseApply
-                  )
-                  (forwarder +: defdefs, forwarder.symbol)
-              }._1
-            )
+            if (defdef.symbol.is(Deferred)){
+              (
+                Some(defdef.symbol),
+                (-1 +: annotationIndices :+ paramCount).sliding(2).toList.foldLeft((Seq.empty[DefDef], defdef.symbol)) {
+                  case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
+                    val forwarder = generateSingleForwarder(
+                      defdef,
+                      defdef.symbol.info,
+                      nextParamIndex,
+                      paramIndex,
+                      nextSymbol,
+                      paramClauseIndex,
+                      defdef.paramss,
+                      isCaseApply
+                    )
+                    (forwarder +: defdefs, forwarder.symbol)
+                }._1
+              )
+
+            }else{
+
+              (
+                None,
+                (annotationIndices :+ paramCount).sliding(2).toList.reverse.foldLeft((Seq.empty[DefDef], defdef.symbol)){
+                  case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
+                    val forwarder = generateSingleForwarder(
+                      defdef,
+                      defdef.symbol.info,
+                      paramIndex,
+                      nextParamIndex,
+                      nextSymbol,
+                      paramClauseIndex,
+                      defdef.paramss,
+                      isCaseApply
+                    )
+                    (forwarder +: defdefs, forwarder.symbol)
+                }._1
+              )
+            }
           }
 
         case multiple => sys.error("Cannot have multiple parameter lists containing `@unroll` annotation")

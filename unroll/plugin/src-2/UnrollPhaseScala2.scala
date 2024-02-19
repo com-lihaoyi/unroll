@@ -78,6 +78,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
     val forwarderMethodType = forwarderMethodType0(defdef.symbol.tpe, 0)
 
+    println("forwarderMethodType " + forwarderMethodType)
     forwarderDefSymbol.setInfo(forwarderMethodType)
 
     val newParamLists = paramLists
@@ -148,13 +149,15 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
       tparams = defdef.tparams,
       vparamss = newParamLists,
       tpt = defdef.tpt,
-      rhs = forwarderCall
+      rhs = if (nextParamIndex == -1) EmptyTree else forwarderCall
     ).set(forwarderDefSymbol)
 
     // No idea why this `if` guard is necessary, but without it we end
-    if (defdef.symbol.owner.isTrait) {
-      defdef.symbol.owner.info.asInstanceOf[ClassInfoType].decls.enter(forwarderDefSymbol)
-    }
+//    if (defdef.symbol.owner.isTrait) {
+//      if ()
+//      defdef.symbol.owner.info.asInstanceOf[ClassInfoType].decls.enter(forwarderDefSymbol)
+//      defdef.symbol.owner.info.asInstanceOf[ClassInfoType].decls.
+//    }
 
     val (fromSyms, toSyms) = symbolReplacements.toList.unzip
     forwarderDef.substituteSymbols(fromSyms, toSyms).asInstanceOf[DefDef]
@@ -163,7 +166,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
 
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
-    def generateDefForwarders(implDef: ImplDef): List[List[DefDef]] = {
+    def generateDefForwarders(implDef: ImplDef): List[(Option[Symbol], Seq[DefDef])] = {
       implDef.impl.body.collect{ case defdef: DefDef =>
 
         val annotatedOpt =
@@ -179,19 +182,21 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
         // Somehow the "apply" methods of case class companions defined within local scopes
         // do not have companion class primary constructor symbols, so we just skip them here
-        annotatedOpt.toList.flatMap{ annotated =>
-          try {
-            annotated.tpe.paramss
+        try {
+          if (annotatedOpt.isEmpty) (None, Nil)
+          else {
+            annotatedOpt.get.tpe.paramss
               .zipWithIndex
               .flatMap{case (annotatedParamList, paramListIndex) =>
                 val annotationIndices = findUnrollAnnotations(annotatedParamList)
                 if (annotationIndices.isEmpty) None
                 else Some((annotatedParamList, annotationIndices, paramListIndex))
               } match{
-              case Nil => Nil
+              case Nil => (None, Nil)
               case Seq((annotatedParamList, annotationIndices, paramListIndex)) =>
                 if (defdef.symbol.isAbstract) {
-                  (annotationIndices :+ annotatedParamList.length).sliding(2).toList.foldLeft((Seq.empty[DefDef], defdef.symbol)) {
+                  (Some(defdef.symbol),
+                  (Seq(-1) ++ annotationIndices ++ Seq(annotatedParamList.length)).sliding(2).toList.foldLeft((Seq.empty[DefDef], defdef.symbol)) {
                     case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
                       val forwarderDef = generateSingleForwarder(
                         implDef,
@@ -203,9 +208,10 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                         defdef.vparamss
                       )
                       (forwarderDef +: defdefs, forwarderDef.symbol)
-                  }._1
+                  }._1)
                 }
                 else {
+                  (None,
                   (annotationIndices :+ annotatedParamList.length).sliding(2).toList.reverse.foldLeft((Seq.empty[DefDef], defdef.symbol)){
                     case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
                       val forwarderDef =  generateSingleForwarder(
@@ -218,17 +224,18 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                         defdef.vparamss
                       )
                       (forwarderDef +: defdefs, forwarderDef.symbol)
-                  }._1
+                  }._1)
                 }
 
               case multiple => sys.error("Multiple")
             }
-          }catch{case e: Throwable =>
-            throw new Exception(
-              s"Failed to generate unrolled defs for $defdef in ${implDef.symbol} in ${implDef.symbol.pos}",
-              e
-            )
           }
+        }catch{case e: Throwable =>
+          throw new Exception(
+            s"Failed to generate unrolled defs for $defdef in ${implDef.symbol} in ${implDef.symbol.pos}",
+            e
+          )
+
         }
       }
     }
@@ -236,8 +243,9 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     override def transform(tree: global.Tree): global.Tree = {
       tree match{
         case md: ModuleDef =>
-          val allNewMethods = generateDefForwarders(md).flatten
-
+          val (removed0, allNewMethodsLists) = generateDefForwarders(md).unzip
+          val removed = removed0.flatten.toSet
+          val allNewMethods = allNewMethodsLists.flatten
           val classInfoType = md.symbol.moduleClass.info.asInstanceOf[ClassInfoType]
           val newClassInfoType = classInfoType.copy(decls = newScopeWith(allNewMethods.map(_.symbol) ++ classInfoType.decls:_*))
 
@@ -251,12 +259,14 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                 md.impl,
                 parents = md.impl.parents,
                 self = md.impl.self,
-                body = md.impl.body ++ allNewMethods
+                body = md.impl.body.filter(t => !removed.contains(t.symbol)) ++ allNewMethods
               )
             )
           )
         case cd: ClassDef =>
-          val allNewMethods = generateDefForwarders(cd).flatten
+          val (removed0, allNewMethodsLists) = generateDefForwarders(cd).unzip
+          val removed = removed0.flatten.toSet
+          val allNewMethods = allNewMethodsLists.flatten
           super.transform(
             treeCopy.ClassDef(
               cd,
@@ -267,7 +277,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                 cd.impl,
                 parents = cd.impl.parents,
                 self = cd.impl.self,
-                body = cd.impl.body ++ allNewMethods
+                body = cd.impl.body.filter(t => !removed.contains(t.symbol)) ++ allNewMethods
               )
             )
           )
