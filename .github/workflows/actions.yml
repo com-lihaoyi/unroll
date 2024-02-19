@@ -29,13 +29,11 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Run JVM tests
         run: |
-          ./mill -i "unroll[_].tests[_].__.run" 
+          ./mill -i -k "unroll[_].tests[_].__.run" 
 
 
   publish-sonatype:
     if: github.repository == 'com-lihaoyi/unroll' && contains(github.ref, 'refs/tags/')
-    needs:
-      - test-jvm
     runs-on: ubuntu-latest
     env:
       SONATYPE_PGP_PRIVATE_KEY: ${{ secrets.SONATYPE_PGP_PRIVATE_KEY }}
