@@ -48,6 +48,10 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
                               annotatedParamListIndex: Int,
                               paramLists: List[List[ValDef]]) = {
 
+    println()
+    println("generateSingleForwarder")
+    println("paramIndex " + paramIndex)
+    println("nextParamIndex " + nextParamIndex)
     val forwarderDefSymbol = defdef.symbol.owner.newMethod(defdef.name)
     val symbolReplacements = defdef
       .vparamss
@@ -117,7 +121,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     }
 
     val forwarderCallArgs = newParamLists.zipWithIndex.map{case (v, i) =>
-      if (i == annotatedParamListIndex) forwardedValueParams ++ defaultCalls
+      if (i == annotatedParamListIndex) forwardedValueParams.take(nextParamIndex) ++ defaultCalls
       else v.map( p => Ident(p.name).set(p.symbol))
     }
 
@@ -186,19 +190,36 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
               } match{
               case Nil => Nil
               case Seq((annotatedParamList, annotationIndices, paramListIndex)) =>
-                (annotationIndices :+ annotatedParamList.length).sliding(2).toList.reverse.foldLeft((Seq.empty[DefDef], defdef.symbol)){
-                  case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
-                    val forwarderDef =  generateSingleForwarder(
-                      implDef,
-                      defdef,
-                      paramIndex,
-                      nextParamIndex,
-                      nextSymbol,
-                      paramListIndex,
-                      defdef.vparamss
-                    )
-                    (forwarderDef +: defdefs, forwarderDef.symbol)
-                }._1
+                if (defdef.symbol.isAbstract) {
+                  (annotationIndices :+ annotatedParamList.length).sliding(2).toList.foldLeft((Seq.empty[DefDef], defdef.symbol)) {
+                    case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
+                      val forwarderDef = generateSingleForwarder(
+                        implDef,
+                        defdef,
+                        nextParamIndex,
+                        paramIndex,
+                        nextSymbol,
+                        paramListIndex,
+                        defdef.vparamss
+                      )
+                      (forwarderDef +: defdefs, forwarderDef.symbol)
+                  }._1
+                }
+                else {
+                  (annotationIndices :+ annotatedParamList.length).sliding(2).toList.reverse.foldLeft((Seq.empty[DefDef], defdef.symbol)){
+                    case ((defdefs, nextSymbol), Seq(paramIndex, nextParamIndex)) =>
+                      val forwarderDef =  generateSingleForwarder(
+                        implDef,
+                        defdef,
+                        paramIndex,
+                        nextParamIndex,
+                        nextSymbol,
+                        paramListIndex,
+                        defdef.vparamss
+                      )
+                      (forwarderDef +: defdefs, forwarderDef.symbol)
+                  }._1
+                }
 
               case multiple => sys.error("Multiple")
             }
