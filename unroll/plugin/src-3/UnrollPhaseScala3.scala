@@ -72,7 +72,10 @@ class UnrollPhaseScala3() extends PluginPhase {
     val forwarderDefSymbol = Symbols.newSymbol(
       defdef.symbol.owner,
       defdef.name,
-      defdef.symbol.flags &~ HasDefaultParams &~ (if (nextParamIndex == -1) Flags.EmptyFlags else Deferred),
+      defdef.symbol.flags &~
+      HasDefaultParams &~
+      (if (nextParamIndex == -1) Flags.EmptyFlags else Deferred) |
+      Invisible,
       truncatedMethodType
     )
 

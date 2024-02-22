@@ -9,9 +9,9 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
   import global._
 
-  val runsAfter = List("typer")
+  val runsAfter = List("pickler")
 
-  override val runsBefore = List("patmat")
+  override val runsBefore = List("refchecks")
 
   val phaseName = "unroll"
 
