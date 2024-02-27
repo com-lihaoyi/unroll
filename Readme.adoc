@@ -105,6 +105,7 @@ First stable release from this repository. No feature additions and removals sin
 
 * 2023-06-03: Published for Scala 2.13.11
 * 2023-09-07: Published for Scala 2.13.12
+* 2024-02-27: Published for Scala 2.13.13
 
 === 0.10.9-alpha-1 - 2022-10-17
 
