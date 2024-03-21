@@ -155,7 +155,7 @@ trait Unrolled{
 }
 
 object Unrolled extends Unrolled{
-  def foo(s: String, n: Int = 1, b: Boolean = true) = s + n + b
+  def foo(s: String, n: Int = 1, @unroll b: Boolean = true) = s + n + b
 }
 ```
 
@@ -163,19 +163,21 @@ Unrolls to:
 
 ```scala
 trait Unrolled{
-  def foo(s: String, n: Int = 1, @unroll b: Boolean = true): String
-  def foo(s: String, n: Int = 1): String = foo(s, n, true)
+  def foo(s: String, n: Int = 1, @unroll b: Boolean = true): String = foo(s, n)
+  def foo(s: String, n: Int = 1): String
 }
 
 object Unrolled extends Unrolled{
-  def foo(s: String, n: Int = 1, b: Boolean = true) = s + n + b
+  def foo(s: String, n: Int = 1, @unroll b: Boolean = true) = s + n + b
+  def foo(s: String, n: Int = 1) = foo(s, n, true)
 }
 ```
 
-Note that only the abstract method needs to be `@unroll`ed, as the generated forwarder
-methods are concrete. The concrete implementation `class` or `object` does not need to 
-`@unroll` its implementation method, as it only needs to implement the abstract `@unroll`ed
-method and not the concrete forwarders.
+Note that only the `@unroll`ed abstract methods generate forwarders in the opposite direction
+as the `@unroll`ed concrete methods. This is necessary due to the fact that downstream code does
+not know which version of `def foo` contains the implementation, and this "two way" forwarding
+ensures that regardless of what signature of `def foo` gets called the forwarders eventually
+forwarder to the actual implementation.
 
 ## Limitations
 
