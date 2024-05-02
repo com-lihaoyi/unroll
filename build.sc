@@ -15,7 +15,7 @@ object Settings {
 }
 
 object Deps {
-  val scalaVersions = 0.to(13).map(v => "2.13." + v)
+  val scalaVersions = 0.to(14).map(v => "2.13." + v)
   val scalaVersion = scalaVersions.reverse.head
   def scalaCompiler(scalaVersion: String) = ivy"org.scala-lang:scala-compiler:${scalaVersion}"
   val sourcecode = ivy"com.lihaoyi::sourcecode:0.3.0"
