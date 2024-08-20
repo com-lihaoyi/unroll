@@ -38,6 +38,12 @@ trait ModuledefsBase extends ScalaModule with PublishModule {
     )
   )
   override def javacOptions = Seq("-source", "1.8", "-target", "1.8", "-encoding", "UTF-8")
+  override def scalacOptions = T {
+    super.scalacOptions() ++ (
+      if (scalaVersion().startsWith("3.")) Seq("-Yexplicit-nulls", "-no-indent")
+      else Seq.empty
+    )
+  }
 }
 
 object moduledefs extends Cross[ModuleDefsCross](Deps.scalaAllVersions.keys.toSeq: _*)
@@ -53,7 +59,10 @@ class ModuleDefsCross(override val crossScalaVersion: String) extends CrossScala
   object plugin extends Cross[PluginCross](Deps.scalaAllVersions(crossScalaVersion): _*)
   class PluginCross(override val crossScalaVersion: String) extends CrossScalaModule
       with ModuledefsBase {
-    override def artifactName = "scalac-mill-" + super.artifactName()
+    override def artifactName = "scalac-mill-moduledefs-plugin"
+                                          // ^^ TODO: cant use `"scalac-mill-" + super.artifactName()` here
+                                          //    because it includes the crossScalaVersion of `moduledefs`
+                                          //    could be addressed with Cross2 from mill 0.11.x
     override def moduleDeps = Seq(moduledefs(outer.crossScalaVersion))
     override def crossFullScalaVersion = true
     override def ivyDeps = Agg(
