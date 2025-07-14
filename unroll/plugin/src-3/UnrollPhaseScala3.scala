@@ -22,7 +22,7 @@ import scala.language.implicitConversions
 class UnrollPhaseScala3() extends PluginPhase {
   import tpd._
 
-  val phaseName = "unroll"
+  val phaseName = "unroll2"
 
   override val runsAfter = Set(transform.Pickler.name)
 
@@ -44,7 +44,7 @@ class UnrollPhaseScala3() extends PluginPhase {
     params
       .zipWithIndex
       .collect {
-        case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "scala.annotation.unroll") =>
+        case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "com.lihaoyi.unroll") =>
           i
       }
   }
@@ -155,17 +155,20 @@ class UnrollPhaseScala3() extends PluginPhase {
       rhs = Match(
         ref(defdef.paramss.head.head.asInstanceOf[ValDef].symbol).select(termName("productArity")),
         startParamIndices.map { paramIndex =>
-          val Apply(select, args) = defdef.rhs
+          val Block(stmts, Apply(select, args)) = defdef.rhs
           CaseDef(
             Literal(Constant(paramIndex)),
             EmptyTree,
-            Apply(
-              select,
-              args.take(paramIndex) ++
-                Range(paramIndex, paramCount).map(n =>
-                  ref(defdef.symbol.owner.companionModule)
-                    .select(DefaultGetterName(defdef.symbol.owner.primaryConstructor.name.toTermName, n))
-                )
+            Block(
+              stmts,
+                Apply(
+                select,
+                args.take(paramIndex) ++
+                  Range(paramIndex, paramCount).map(n =>
+                    ref(defdef.symbol.owner.companionModule)
+                      .select(DefaultGetterName(defdef.symbol.owner.primaryConstructor.name.toTermName, n))
+                  )
+              )
             )
           )
         } ++ Seq(

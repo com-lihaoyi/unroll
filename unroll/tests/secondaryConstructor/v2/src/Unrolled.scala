@@ -1,6 +1,6 @@
 package unroll
 
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 class Unrolled() {
   var foo = ""

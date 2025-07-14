@@ -40,7 +40,7 @@ See this original discussion for more context:
 ### Methods
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 object Unrolled{
    def foo(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0) = s + n + b + l
@@ -50,7 +50,7 @@ object Unrolled{
 Unrolls to:
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 object Unrolled{
    def foo(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0) = s + n + b + l
@@ -62,7 +62,7 @@ object Unrolled{
 ### Classes
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0){
    def foo = s + n + b + l
@@ -72,7 +72,7 @@ class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0){
 Unrolls to:
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0){
    def foo = s + n + b + l
@@ -85,7 +85,7 @@ class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0){
 ### Constructors
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 class Unrolled() {
    var foo = ""
@@ -100,7 +100,7 @@ class Unrolled() {
 Unrolls to:
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 class Unrolled() {
    var foo = ""
@@ -118,7 +118,7 @@ class Unrolled() {
 ### Case Classes
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 case class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true){
   def foo = s + n + b
@@ -128,7 +128,7 @@ case class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true){
 Unrolls to:
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 case class Unrolled(s: String, n: Int = 1, @unroll b: Boolean = true, l: Long = 0L){
    def this(s: String, n: Int) = this(s, n, true, 0L)
@@ -148,7 +148,7 @@ object Unrolled{
 ### Abstract Methods
 
 ```scala
-import scala.annotation.unroll
+import com.lihaoyi.unroll
 
 trait Unrolled{
   def foo(s: String, n: Int = 1, @unroll b: Boolean = true): String

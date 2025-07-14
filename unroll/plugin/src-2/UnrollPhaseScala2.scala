@@ -21,7 +21,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
   def findUnrollAnnotations(params: Seq[Symbol]): Seq[Int] = {
     params.toList.zipWithIndex.collect {
-      case (v, i) if v.annotations.exists(_.tpe =:= typeOf[scala.annotation.unroll]) => i
+      case (v, i) if v.annotations.exists(_.tpe =:= typeOf[com.lihaoyi.unroll]) => i
     }
   }
 
