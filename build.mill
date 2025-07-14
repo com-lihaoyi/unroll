@@ -13,7 +13,7 @@ import scala.util.chaining._
 
 val scala212  = "2.12.18"
 val scala213  = "2.13.12"
-val scala3  = "3.3.1"
+val scala3  = "3.7.1"
 
 val scalaVersions = Seq(scala212, scala213, scala3)
 
@@ -26,11 +26,11 @@ trait UnrollModule extends Cross.Module[String]{
   }
 
   trait InnerScalaJsModule extends InnerScalaModule with ScalaJSModule{
-    def scalaJSVersion = "1.13.1"
+    def scalaJSVersion = "1.19.0"
   }
 
   trait InnerScalaNativeModule extends InnerScalaModule with ScalaNativeModule{
-    def scalaNativeVersion = "0.4.14"
+    def scalaNativeVersion = "0.5.8"
   }
 
   trait InnerPublishModule extends InnerScalaModule with PublishModule{
