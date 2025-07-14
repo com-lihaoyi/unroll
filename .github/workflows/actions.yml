@@ -29,7 +29,7 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Run JVM tests
         run: |
-          ./mill -i -k "unroll[_].tests[_].__.run" 
+          ./mill -i -k "unroll[_].tests[_].__.jvm.run" 
 
 
   publish-sonatype:
