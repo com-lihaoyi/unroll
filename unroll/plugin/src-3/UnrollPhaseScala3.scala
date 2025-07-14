@@ -160,7 +160,7 @@ class UnrollPhaseScala3() extends PluginPhase {
             Literal(Constant(paramIndex)),
             EmptyTree,
             Block(
-              stmts,
+              stmts.take(paramIndex),
                 Apply(
                 select,
                 args.take(paramIndex) ++
