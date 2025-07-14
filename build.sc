@@ -1,7 +1,8 @@
+//| mill-version: 1.0.0
+//| mvnDeps:
+//| - com.github.lolgab::mill-mima_mill1:0.2.0
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._
-import $ivy.`com.github.lolgab::mill-mima::0.1.0`
-import $ivy.`de.tototec::de.tobiasroeser.mill.vcs.version::0.4.0`
-import de.tobiasroeser.mill.vcs.version.VcsVersion
+import mill.util.VcsVersion
 import com.github.lolgab.mill.mima.{CheckDirection, ProblemFilter, Mima}
 import com.github.lolgab.mill.mima.worker.MimaBuildInfo
 import com.github.lolgab.mill.mima.IncompatibleSignatureProblem
@@ -21,7 +22,7 @@ object unroll extends Cross[UnrollModule](scalaVersions)
 trait UnrollModule extends Cross.Module[String]{
   trait InnerScalaModule extends CrossScalaModule {
     def crossValue = UnrollModule.this.crossValue
-    override def artifactNameParts: T[Seq[String]] = millModuleSegments.parts.patch(1, Nil, 1)
+    override def artifactNameParts: T[Seq[String]] = moduleSegments.parts.patch(1, Nil, 1)
   }
 
   trait InnerScalaJsModule extends InnerScalaModule with ScalaJSModule{
@@ -49,9 +50,9 @@ trait UnrollModule extends Cross.Module[String]{
   object annotation extends InnerPublishModule
   object plugin extends InnerPublishModule{
     def moduleDeps = Seq(annotation)
-    def ivyDeps = T{
-      if (scalaVersion().startsWith("2.")) Agg(ivy"org.scala-lang:scala-compiler:${scalaVersion()}")
-      else  Agg(ivy"org.scala-lang:scala3-compiler_3:${scalaVersion()}")
+    def mvnDeps = Task{
+      if (scalaVersion().startsWith("2.")) Seq(ivy"org.scala-lang:scala-compiler:${scalaVersion()}")
+      else  Seq(ivy"org.scala-lang:scala3-compiler_3:${scalaVersion()}")
     }
   }
 
@@ -76,7 +77,7 @@ trait UnrollModule extends Cross.Module[String]{
   object tests extends Cross[Tests](testcases)
 
   trait Tests extends Cross.Module[String]{
-    override def millSourcePath = super.millSourcePath / crossValue
+    override def moduleDir = super.moduleDir / crossValue
     trait DownstreamModule extends Module{
       def jvm: InnerScalaModule
       def js: InnerScalaJsModule
@@ -88,33 +89,33 @@ trait UnrollModule extends Cross.Module[String]{
       object downstream extends DownstreamModule{
 
         object jvm extends InnerScalaModule with Unrolled {
-          def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
+          def run(args: Task[Args] = Task.Anon(Args())) = Task.Command{/*donothing*/}
           def moduleDeps = Seq(CrossPlatformModule.this.jvm)
         }
         object js extends InnerScalaJsModule with Unrolled {
-          def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
+          def run(args: Task[Args] = Task.Anon(Args())) = Task.Command{/*donothing*/}
           def moduleDeps = Seq(CrossPlatformModule.this.js)
         }
         object native extends InnerScalaNativeModule with Unrolled {
-          def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
+          def run(args: Task[Args] = Task.Anon(Args())) = Task.Command{/*donothing*/}
           def moduleDeps = Seq(CrossPlatformModule.this.native)
         }
       }
 
       trait Unrolled extends InnerScalaModule with PlatformScalaModule{
         def moduleDeps: Seq[JavaModule] = Seq(annotation)
-        def run(args: Task[Args] = T.task(Args())) = T.command{/*donothing*/}
-        def mimaPreviousArtifacts = T{
+        def run(args: Task[Args] = Task.Anon(Args())) = Task.Command{/*donothing*/}
+        def mimaPreviousArtifacts = Task{
           if (Tests.this.crossValue == "caseclass" && scalaVersion().startsWith("2.")) Nil
-          else T.traverse(mimaPrevious)(_.jvm.jar)()
+          else Task.traverse(mimaPrevious)(_.jvm.jar)()
         }
-        def scalacPluginClasspath = T{ Agg(plugin.jar()) }
+        def scalacPluginClasspath = Task{ Seq(plugin.jar()) }
 
-        // override def scalaCompilerClasspath = T{
+        // override def scalaCompilerClasspath = Task{
         //   super.scalaCompilerClasspath().filter(!_.toString().contains("scala3-compiler")) ++
-        //   Agg(PathRef(os.Path("/Users/lihaoyi/.ivy2/local/org.scala-lang/scala3-compiler_3/3.3.2-RC3-bin-SNAPSHOT/jars/scala3-compiler_3.jar")))
+        //   Seq(PathRef(os.Path("/Users/lihaoyi/.ivy2/local/org.scala-lang/scala3-compiler_3/3.3.2-RC3-bin-SNAPSHOT/jars/scala3-compiler_3.jar")))
         // }
-        def scalacOptions = T{
+        def scalacOptions = Task{
           Seq(
             s"-Xplugin:${plugin.jar().path}",
             "-Xplugin-require:unroll",
@@ -132,7 +133,7 @@ trait UnrollModule extends Cross.Module[String]{
           def sources = super.sources() ++ testutils.sources()
           def moduleDeps = Seq(Unrolled.this)
           def mainClass = Some("unroll.UnrollTestMain")
-          def testFramework = T{ "" } // stub
+          def testFramework = Task{ "" } // stub
         }
       }
 
@@ -219,34 +220,34 @@ trait UnrollModule extends Cross.Module[String]{
 // two compilation outputs for testing purposes.
 trait LocalMimaModule extends ScalaModule{
 
-  def mimaWorkerClasspath: T[Agg[PathRef]] = T {
+  def mimaWorkerClasspath: T[Seq[PathRef]] = Task {
     Lib
       .resolveDependencies(
         repositoriesTask(),
-        Agg(
+        Seq(
           ivy"com.github.lolgab:mill-mima-worker-impl_2.13:${MimaBuildInfo.publishVersion}"
             .exclude("com.github.lolgab" -> "mill-mima-worker-api_2.13")
-        ).map(Lib.depToBoundDep(_, mill.main.BuildInfo.scalaVersion)),
-        ctx = Some(T.log)
+        ).map(Lib.depToBoundDep(_, mill.util.BuildInfo.scalaVersion)),
+        ctx = Some(Task.ctx())
       )
   }
 
-  def mimaWorker2: Task[worker.api.MimaWorkerApi] = T.task {
+  def mimaWorker2: Task[worker.api.MimaWorkerApi] = Task.Anon {
     val cp = mimaWorkerClasspath()
     MimaWorkerExternalModule.mimaWorker().impl(cp)
   }
   def mimaCurrentArtifact: T[PathRef] = jar()
   def mimaPreviousArtifacts: T[Seq[PathRef]]
-  def mimaReportBinaryIssues(): Command[Unit] = T.command {
-    val logDebug: java.util.function.Consumer[String] = T.log.debug(_)
-    val logError: java.util.function.Consumer[String] = T.log.error(_)
+  def mimaReportBinaryIssues(): Command[Unit] = Task.Command {
+    val logDebug: java.util.function.Consumer[String] = Task.log.debug(_)
+    val logError: java.util.function.Consumer[String] = Task.log.error(_)
     val logPrintln: java.util.function.Consumer[String] =
-      T.log.outputStream.println(_)
+      Task.log.streams.out.println(_)
     val runClasspathIO =
       runClasspath().view.map(_.path).filter(os.exists).map(_.toIO).toArray
     val current = mimaCurrentArtifact().path.pipe {
       case p if os.exists(p) => p
-      case _                 => (T.dest / "emptyClasses").tap(os.makeDir)
+      case _                 => (Task.dest / "emptyClasses").tap(os.makeDir)
     }.toIO
 
     val previous = mimaPreviousArtifacts().iterator.map {
@@ -256,26 +257,26 @@ trait LocalMimaModule extends ScalaModule{
 
     val checkDirection = worker.api.CheckDirection.Backward
 
-    val errorOpt: java.util.Optional[String] = mimaWorker2().reportBinaryIssues(
+    val errorOpt: Option[String] = mimaWorker2().reportBinaryIssues(
       scalaVersion() match{
-        case s"2.$x.$y" => s"2.$x"
-        case s"3.$x.$y" => s"3"
+        case s"2.$x.$y" => Some(s"2.$x")
+        case s"3.$x.$y" => Some(s"3")
       },
-      logDebug,
-      logError,
-      logPrintln,
+      logDebug.accept,
+      logError.accept,
+      logPrintln.accept,
       checkDirection,
       runClasspathIO,
       previous,
       current,
-      Array(),
-      new java.util.HashMap(),
-      new java.util.HashMap(),
-      Array(),
-      "dev"
+      Seq(),
+      Map(),
+      Map(),
+      Seq(),
+      Some("dev")
     )
 
-    if (errorOpt.isPresent()) mill.api.Result.Failure(errorOpt.get())
+    if (errorOpt.nonEmpty) mill.api.Result.Failure(errorOpt.get)
     else mill.api.Result.Success(())
   }
 }
