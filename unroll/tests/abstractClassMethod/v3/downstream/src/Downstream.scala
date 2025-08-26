@@ -13,3 +13,7 @@ class UnrolledCls extends Unrolled {
 object UnrollMisc{
   def expectedLength = 9
 }
+
+final class Foo {
+  def bar(@unroll x: Int = 0) = x + 1
+}

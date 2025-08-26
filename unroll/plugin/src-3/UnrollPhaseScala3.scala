@@ -211,6 +211,15 @@ class UnrollPhaseScala3() extends PluginPhase {
         }  match{
         case Nil => (None, Nil)
         case Seq((paramClauseIndex, annotationIndices)) =>
+
+          val isFinal = defdef.symbol.is(Flags.Final)
+
+          val isOwnerFinal = {
+            var owner = defdef.symbol.ownersIterator
+          }
+
+          report.error(defdef.symbol.ownersIterator.toList.map(owner => s"${owner} -> ${owner.flags.is(Flags.Local)}").toString())
+
           val paramCount = annotated.paramSymss(paramClauseIndex).size
           if (isCaseFromProduct) {
             (Some(defdef.symbol), Seq(generateFromProduct(annotationIndices, paramCount, defdef)))
