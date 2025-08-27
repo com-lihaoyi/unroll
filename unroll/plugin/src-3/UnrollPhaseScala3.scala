@@ -211,14 +211,15 @@ class UnrollPhaseScala3() extends PluginPhase {
         }  match{
         case Nil => (None, Nil)
         case Seq((paramClauseIndex, annotationIndices)) =>
+          val method = defdef.symbol
 
-          val isFinal = defdef.symbol.is(Flags.Final)
+          if method.isLocal 
+            || !method.isEffectivelyFinal 
+            || method.isConstructor && method.owner.is(Trait) 
+            || isCaseApply 
+            || isCaseFromProduct 
+            || isCaseCopy then report.error("ILLEGAL UNROLL, BOOO")
 
-          val isOwnerFinal = {
-            var owner = defdef.symbol.ownersIterator
-          }
-
-          report.error(defdef.symbol.ownersIterator.toList.map(owner => s"${owner} -> ${owner.flags.is(Flags.Local)}").toString())
 
           val paramCount = annotated.paramSymss(paramClauseIndex).size
           if (isCaseFromProduct) {
