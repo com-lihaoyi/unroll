@@ -19,9 +19,24 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     new UnrollTransformer(unit)
   }
 
+  private def isValidUnrolledMethod(method: Symbol, origin: Position) = {
+    val isCtor = method.isConstructor
+
+    //this is wrong, .isEffectivelyFinal is true for abstract methods? :c or maybe some other thing is falling into here
+    if (method.owner.isCaseClass && isCtor) true
+    else if (method.isLocal
+      || method.isAbstract
+      || !method.isEffectivelyFinal
+      || method.owner.companionClass.isCaseClass && method.name == nme.apply
+      || method.owner.isCaseClass && method.name == nme.copy) {
+        globalError(origin, "ILLEGAL UNROLL, BOO")
+        false
+      } else true
+  }
+
   def findUnrollAnnotations(params: Seq[Symbol]): Seq[Int] = {
     params.toList.zipWithIndex.collect {
-      case (v, i) if v.annotations.exists(_.tpe =:= typeOf[com.lihaoyi.unroll]) => i
+      case (v, i) if v.annotations.exists(_.tpe =:= typeOf[com.lihaoyi.unroll]) && isValidUnrolledMethod(v.owner, v.pos) => i
     }
   }
 
@@ -280,4 +295,3 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     }
   }
 }
-
