@@ -23,13 +23,39 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     val isCtor = method.isConstructor
 
     //this is wrong, .isEffectivelyFinal is true for abstract methods? :c or maybe some other thing is falling into here
-    if (method.owner.isCaseClass && isCtor) true
-    else if (method.isLocal
-      || method.isAbstract
-      || !method.isEffectivelyFinal
+    // if (method.owner.isCaseClass && isCtor) true
+    // else 
+    // globalError("AAAAAAAAAAAAAAa")
+
+    // inform(origin, s"""
+    // |${method.nameString}
+    // |isLocal = ${method.isLocal}
+    // |isEffFinal = ${method.isEffectivelyFinal}
+    // |isAbstract = ${method.isAbstract}
+    // |owner.isFinal = ${method.owner.isFinal}
+    // |owner.isEffFinak = ${method.owner.isEffectivelyFinal}
+    // |owner.isModuleOrModuleClass = ${method.owner.isModuleOrModuleClass}
+    // """)
+
+    def explanation = {
+      def what = if (isCtor) s"a class constructor" else s"method ${method.name}"
+      val prefix = s"Cannot unroll parameters of $what"
+      if (method.isLocalToBlock)
+        s"$prefix because it is a local method"
+      else if (!method.isEffectivelyFinal && !method.owner.isEffectivelyFinal)
+        s"$prefix because it can be overridden"
+      else if (method.owner.companionClass.isCaseClass)
+        s"$prefix of a case class companion object: please annotate the class constructor instead"
+      else
+        s"$prefix of a case class: please annotate the class constructor instead"
+    }
+
+    if (isCtor) true
+    else if (method.isLocalToBlock
+      || !method.isEffectivelyFinal && !method.owner.isEffectivelyFinal
       || method.owner.companionClass.isCaseClass && method.name == nme.apply
       || method.owner.isCaseClass && method.name == nme.copy) {
-        globalError(origin, "ILLEGAL UNROLL, BOO")
+        globalError(origin, explanation)
         false
       } else true
   }
