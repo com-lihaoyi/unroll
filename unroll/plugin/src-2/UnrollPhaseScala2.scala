@@ -22,21 +22,6 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
   private def isValidUnrolledMethod(method: Symbol, origin: Position) = {
     val isCtor = method.isConstructor
 
-    //this is wrong, .isEffectivelyFinal is true for abstract methods? :c or maybe some other thing is falling into here
-    // if (method.owner.isCaseClass && isCtor) true
-    // else 
-    // globalError("AAAAAAAAAAAAAAa")
-
-    // inform(origin, s"""
-    // |${method.nameString}
-    // |isLocal = ${method.isLocal}
-    // |isEffFinal = ${method.isEffectivelyFinal}
-    // |isAbstract = ${method.isAbstract}
-    // |owner.isFinal = ${method.owner.isFinal}
-    // |owner.isEffFinak = ${method.owner.isEffectivelyFinal}
-    // |owner.isModuleOrModuleClass = ${method.owner.isModuleOrModuleClass}
-    // """)
-
     def explanation = {
       def what = if (isCtor) s"a class constructor" else s"method ${method.name}"
       val prefix = s"Cannot unroll parameters of $what"
