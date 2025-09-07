@@ -75,11 +75,19 @@ class UnrollPhaseScala3() extends PluginPhase {
     else true
   }
 
-  def findUnrollAnnotations(params: List[Symbol])(using Context): List[Int] = {
+  // if `annotatedMethod` is a case class apply, case class copy or case class fromProduct then `params` actually comes from the case class' primary constructor
+  // but we still need to check the actual annotated method hence the two-step check
+  def findUnrollAnnotations(params: List[Symbol], specialCasedMethod: Option[Symbol])(using Context): List[Int] = {
+    def hasUnrollAnnotation(sym: Symbol) = sym.annotations.exists(_.symbol.fullName.toString == "com.lihaoyi.unroll")
+
+    specialCasedMethod.foreach { annotatedMethod => 
+      if annotatedMethod.paramSymss.exists(_.exists(hasUnrollAnnotation)) then isValidUnrolledMethod(annotatedMethod, annotatedMethod.sourcePos)
+    }
+      
     params
       .zipWithIndex
       .collect {
-        case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "com.lihaoyi.unroll") && isValidUnrolledMethod(v.owner, v.sourcePos) =>
+        case (v, i) if hasUnrollAnnotation(v) && isValidUnrolledMethod(v.owner, v.sourcePos) =>
           i
       }
   }
@@ -235,12 +243,13 @@ class UnrollPhaseScala3() extends PluginPhase {
         else if (isCaseFromProduct) defdef.symbol.owner.companionClass.primaryConstructor
         else defdef.symbol
 
+      val specialCasedMethod = Option.when(isCaseCopy || isCaseApply || isCaseFromProduct)(defdef.symbol)
 
       annotated
         .paramSymss
         .zipWithIndex
         .flatMap{case (paramClause, paramClauseIndex) =>
-          val annotationIndices = findUnrollAnnotations(paramClause)
+          val annotationIndices = findUnrollAnnotations(paramClause, specialCasedMethod)
           if (annotationIndices.isEmpty) None
           else Some((paramClauseIndex, annotationIndices))
         }  match{

@@ -10,6 +10,7 @@ import com.github.lolgab.mill.mima.worker
 import com.github.lolgab.mill.mima.worker.MimaWorkerExternalModule
 
 import scala.util.chaining._
+import os.Path
 
 val scala212  = "2.12.18"
 val scala213  = "2.13.12"
@@ -56,6 +57,24 @@ trait UnrollModule extends Cross.Module[String]{
     }
   }
 
+  object negative extends ScalaModule {
+    override def moduleDir: Path = 
+      if (UnrollModule.this.crossValue.startsWith("2.")) (super.moduleDir / "scala2") else (super.moduleDir / "scala3")
+
+    def moduleDeps: Seq[JavaModule] = Seq(annotation)
+
+    def scalaVersion = UnrollModule.this.crossValue
+
+    def scalacPluginClasspath = Task{ Seq(plugin.jar()) }
+
+    def scalacOptions = Task {
+        Seq(
+          s"-Xplugin:${plugin.jar().path}",
+          "-Xplugin-require:unroll",
+        )
+      }
+  }
+
   object testutils extends InnerScalaModule
 
   val testcases = Seq(
@@ -69,10 +88,7 @@ trait UnrollModule extends Cross.Module[String]{
     "secondaryConstructor",
     "caseclass",
     "secondParameterList",
-    "abstractTraitMethod",
-    "abstractClassMethod"
   )
-
 
   object tests extends Cross[Tests](testcases)
 
@@ -280,4 +296,3 @@ trait LocalMimaModule extends ScalaModule{
     else mill.api.Result.Success(())
   }
 }
-
