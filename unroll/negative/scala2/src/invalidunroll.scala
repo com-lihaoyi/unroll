@@ -6,7 +6,11 @@ class Foo {
   def foo(int: Int, @unroll str: String = "1") = int.toString() + str
 
   def fooInner(int: Int) = {
-    def inner(a: Int, @unroll str: String = "1") = str
+    def inner(a: Int, @unroll str: String = "1") = {
+      def anEvenMoreInnerMethUnrolled(@unroll int: Int = 1) = ()
+      str
+    }
+    def innerNonUnrollMethod(str: String) = str
   }
 }
 

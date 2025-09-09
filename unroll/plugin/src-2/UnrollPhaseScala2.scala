@@ -25,7 +25,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     def explanation = {
       def what = if (isCtor) s"a class constructor" else s"method ${method.name}"
       val prefix = s"Cannot unroll parameters of $what"
-      if (method.isLocalToBlock)
+      if (isLocalMethod(method))
         s"$prefix because it is a local method"
       else if (!method.isEffectivelyFinal && !method.owner.isEffectivelyFinal)
         s"$prefix because it can be overridden"
@@ -36,7 +36,7 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     }
 
     if (isCtor) true
-    else if (method.isLocalToBlock
+    else if (isLocalMethod(method)
       || !method.isEffectivelyFinal && !method.owner.isEffectivelyFinal
       || method.owner.companionClass.isCaseClass && method.name == nme.apply
       || method.owner.isCaseClass && method.name == nme.copy) {
@@ -47,9 +47,15 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
 
   def findUnrollAnnotations(params: Seq[Symbol]): Seq[Int] = {
     params.toList.zipWithIndex.collect {
-      case (v, i) if v.annotations.exists(_.tpe =:= typeOf[com.lihaoyi.unroll]) && isValidUnrolledMethod(v.owner, v.pos) => i
+      case (v, i) if hasUnrollAnnotation(v) && isValidUnrolledMethod(v.owner, v.pos) => i
     }
   }
+
+  private def hasUnrollAnnotation(symbol: Symbol) =
+    symbol.annotations.exists(_.tpe =:= typeOf[com.lihaoyi.unroll])
+
+  private def methodHasUnroll(method: Symbol) =
+    method.paramss.exists(_.exists(hasUnrollAnnotation))
 
   def copyValDef(vd: ValDef) = {
     val newMods = vd.mods.copy(flags = vd.mods.flags ^ Flags.DEFAULTPARAM)
@@ -183,11 +189,27 @@ class UnrollPhaseScala2(val global: Global) extends PluginComponent with TypingT
     forwarderDef.substituteSymbols(fromSyms, toSyms).asInstanceOf[DefDef]
   }
 
+  private object LintInnerMethods extends Traverser {
+    override def traverse(tree: Tree): Unit = {
+      tree match {
+        case method: DefDef =>
+          if (methodHasUnroll(method.symbol)) isValidUnrolledMethod(method.symbol, method.pos)
+          traverseChildren(method.rhs)
+        case _ => ()
+      }
+    }
 
+    final def traverseChildren(tree: Tree): Unit = super.traverse(tree)
+  }
+
+  private def isLocalMethod(sym: Symbol): Boolean = {
+    sym.ownerChain.tail.exists(_.isMethod) || sym.isLocalToBlock
+  }
 
   class UnrollTransformer(unit: global.CompilationUnit) extends TypingTransformer(unit) {
     def generateDefForwarders(implDef: ImplDef): List[(Option[Symbol], Seq[DefDef])] = {
       implDef.impl.body.collect{ case defdef: DefDef =>
+        LintInnerMethods.traverseChildren(defdef.rhs)
 
         val annotatedOpt =
           if (defdef.symbol.isCaseCopy && defdef.symbol.name.toString == "copy") {

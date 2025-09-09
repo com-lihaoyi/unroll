@@ -75,13 +75,13 @@ class UnrollPhaseScala3() extends PluginPhase {
     else true
   }
 
+
   // if `annotatedMethod` is a case class apply, case class copy or case class fromProduct then `params` actually comes from the case class' primary constructor
   // but we still need to check the actual annotated method hence the two-step check
   def findUnrollAnnotations(params: List[Symbol], specialCasedMethod: Option[Symbol])(using Context): List[Int] = {
-    def hasUnrollAnnotation(sym: Symbol) = sym.annotations.exists(_.symbol.fullName.toString == "com.lihaoyi.unroll")
 
     specialCasedMethod.foreach { annotatedMethod => 
-      if annotatedMethod.paramSymss.exists(_.exists(hasUnrollAnnotation)) then isValidUnrolledMethod(annotatedMethod, annotatedMethod.sourcePos)
+      if methodHasUnroll(annotatedMethod) then isValidUnrolledMethod(annotatedMethod, annotatedMethod.sourcePos)
     }
       
     params
@@ -91,6 +91,13 @@ class UnrollPhaseScala3() extends PluginPhase {
           i
       }
   }
+
+  private def methodHasUnroll(method: Symbol)(using Context) =
+    method.paramSymss.exists(_.exists(hasUnrollAnnotation))
+
+  private def hasUnrollAnnotation(sym: Symbol)(using Context) = 
+    sym.annotations.exists(_.symbol.fullName.toString == "com.lihaoyi.unroll")
+
   def isTypeClause(p: ParamClause) = p.headOption.exists(_.isInstanceOf[TypeDef])
   def generateSingleForwarder(defdef: DefDef,
                               prevMethodType: Type,
@@ -229,6 +236,8 @@ class UnrollPhaseScala3() extends PluginPhase {
     case defdef: DefDef if defdef.paramss.nonEmpty =>
       import dotty.tools.dotc.core.NameOps.isConstructorName
 
+      LintInnerMethods.traverseChildren(defdef.rhs)
+
       val isCaseCopy =
         defdef.name.toString == "copy" && defdef.symbol.owner.is(CaseClass)
 
@@ -304,6 +313,17 @@ class UnrollPhaseScala3() extends PluginPhase {
       }
 
     case _ => (None, Nil)
+  }
+
+  private object LintInnerMethods extends TreeTraverser {
+    override def traverse(tree: Tree)(using Context): Unit =
+      tree match {
+        case method: DefDef =>
+          if methodHasUnroll(method.symbol) then isValidUnrolledMethod(method.symbol, method.sourcePos)
+          traverseChildren(method.rhs)
+        case _ => ()
+      }
+    override def traverseChildren(tree: Tree)(using Context): Unit = super.traverseChildren(tree)
   }
 
   override def transformTemplate(tmpl: tpd.Template)(using Context): tpd.Tree = {
