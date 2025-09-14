@@ -18,6 +18,7 @@ import dotty.tools.dotc.core.Types.{MethodType, NamedType, PolyType, Type}
 import dotty.tools.dotc.core.Symbols
 
 import scala.language.implicitConversions
+import dotty.tools.dotc.util.SrcPos
 
 class UnrollPhaseScala3() extends PluginPhase {
   import tpd._
@@ -40,14 +41,63 @@ class UnrollPhaseScala3() extends PluginPhase {
     )
   }
 
-  def findUnrollAnnotations(params: List[Symbol])(using Context): List[Int] = {
+  /**
+   * Adapted from:
+   * - https://github.com/scala/scala3/pull/21693/files#diff-367e32065f51ed46353fdaaf526ab7e7899404b219d24d5b1054fce7f376dfe5R127
+   * - https://github.com/scala/scala3/pull/21693/files#diff-e054695755ff26925ae51361df0f7cd4940bc1fd7ceb658023d0dc38c18178c3R3412
+   * - https://github.com/scala/scala3/pull/22926/files#diff-367e32065f51ed46353fdaaf526ab7e7899404b219d24d5b1054fce7f376dfe5R135
+   */
+  private def isValidUnrolledMethod(method: Symbol, origin: SrcPos)(using Context) = {
+    val isCtor = method.isConstructor
+
+    def explanation =
+      def what = if isCtor then i"a ${if method.owner.is(Trait) then "trait" else "class"} constructor" else i"method ${method.name}"
+      val prefix = s"Cannot unroll parameters of $what"
+      if method.isLocal then
+        i"$prefix because it is a local method"
+      else if !method.isEffectivelyFinal then
+        i"$prefix because it can be overridden"
+      else if isCtor && method.owner.is(Trait) then
+        i"implementation restriction: $prefix"
+      else if method.owner.companionClass.is(CaseClass) then
+        i"$prefix of a case class companion object: please annotate the class constructor instead"
+      else
+        i"$prefix of a case class: please annotate the class constructor instead"
+
+    if method.name.is(DefaultGetterName) then false
+    else if method.isLocal
+      || !method.isEffectivelyFinal
+      || isCtor && method.owner.is(Trait)
+      || method.owner.companionClass.is(CaseClass) && (method.name == nme.apply || method.name == nme.fromProduct)
+      || method.owner.is(CaseClass) && method.name == nme.copy then
+        report.error(explanation, origin)
+        false
+    else true
+  }
+
+
+  // if `annotatedMethod` is a case class apply, case class copy or case class fromProduct then `params` actually comes from the case class' primary constructor
+  // but we still need to check the actual annotated method hence the two-step check
+  def findUnrollAnnotations(params: List[Symbol], specialCasedMethod: Option[Symbol])(using Context): List[Int] = {
+
+    specialCasedMethod.foreach { annotatedMethod => 
+      if methodHasUnroll(annotatedMethod) then isValidUnrolledMethod(annotatedMethod, annotatedMethod.sourcePos)
+    }
+      
     params
       .zipWithIndex
       .collect {
-        case (v, i) if v.annotations.exists(_.symbol.fullName.toString == "com.lihaoyi.unroll") =>
+        case (v, i) if hasUnrollAnnotation(v) && isValidUnrolledMethod(v.owner, v.sourcePos) =>
           i
       }
   }
+
+  private def methodHasUnroll(method: Symbol)(using Context) =
+    method.paramSymss.exists(_.exists(hasUnrollAnnotation))
+
+  private def hasUnrollAnnotation(sym: Symbol)(using Context) = 
+    sym.annotations.exists(_.symbol.fullName.toString == "com.lihaoyi.unroll")
+
   def isTypeClause(p: ParamClause) = p.headOption.exists(_.isInstanceOf[TypeDef])
   def generateSingleForwarder(defdef: DefDef,
                               prevMethodType: Type,
@@ -186,6 +236,8 @@ class UnrollPhaseScala3() extends PluginPhase {
     case defdef: DefDef if defdef.paramss.nonEmpty =>
       import dotty.tools.dotc.core.NameOps.isConstructorName
 
+      LintInnerMethods.traverseChildren(defdef.rhs)
+
       val isCaseCopy =
         defdef.name.toString == "copy" && defdef.symbol.owner.is(CaseClass)
 
@@ -200,12 +252,13 @@ class UnrollPhaseScala3() extends PluginPhase {
         else if (isCaseFromProduct) defdef.symbol.owner.companionClass.primaryConstructor
         else defdef.symbol
 
+      val specialCasedMethod = Option.when(isCaseCopy || isCaseApply || isCaseFromProduct)(defdef.symbol)
 
       annotated
         .paramSymss
         .zipWithIndex
         .flatMap{case (paramClause, paramClauseIndex) =>
-          val annotationIndices = findUnrollAnnotations(paramClause)
+          val annotationIndices = findUnrollAnnotations(paramClause, specialCasedMethod)
           if (annotationIndices.isEmpty) None
           else Some((paramClauseIndex, annotationIndices))
         }  match{
@@ -260,6 +313,17 @@ class UnrollPhaseScala3() extends PluginPhase {
       }
 
     case _ => (None, Nil)
+  }
+
+  private object LintInnerMethods extends TreeTraverser {
+    override def traverse(tree: Tree)(using Context): Unit =
+      tree match {
+        case method: DefDef =>
+          if methodHasUnroll(method.symbol) then isValidUnrolledMethod(method.symbol, method.sourcePos)
+          traverseChildren(method.rhs)
+        case _ => ()
+      }
+    override def traverseChildren(tree: Tree)(using Context): Unit = super.traverseChildren(tree)
   }
 
   override def transformTemplate(tmpl: tpd.Template)(using Context): tpd.Tree = {
