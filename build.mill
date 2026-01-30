@@ -1,4 +1,4 @@
-//| mill-version: 1.0.0
+//| mill-version: 1.0.6
 //| mvnDeps:
 //| - com.github.lolgab::mill-mima_mill1:0.2.0
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._
@@ -12,14 +12,78 @@ import com.github.lolgab.mill.mima.worker.MimaWorkerExternalModule
 import scala.util.chaining._
 import os.Path
 
-val scala212  = "2.12.18"
-val scala213  = "2.13.12"
-val scala3  = "3.7.1"
+object v {
+  val scala212: Seq[String] = 18.to(21).map("2.12." + _)
+  val scala213: Seq[String] = 11.to(18).map("2.13." + _)
+  val scala33: Seq[String] = 4.to(7).map("3.3." + _)
+  val scala34: Seq[String] = 0.to(3).map("3.4." + _)
+  val scala35: Seq[String] = 0.to(2).map("3.5." + _)
+  val scala36: Seq[String] = 0.to(4).map("3.6." + _)
+  val scala37: Seq[String] = 0.to(4).map("3.7." + _)
+  val scala38: Seq[String] = 0.to(1).map("3.8." + _)
 
-val scalaVersions = Seq(scala212, scala213, scala3)
+  def scalaCompiler(scalaVersion: String): Dep =
+    if (scalaVersion.startsWith("3.")) mvn"org.scala-lang::scala3-compiler:$scalaVersion"
+    else mvn"org.scala-lang:scala-compiler:$scalaVersion"
 
+  val pluginScalaVersions: Seq[String] =
+    scala212 ++ scala213 ++ scala33 ++ scala34 ++ scala35 ++ scala36 ++ scala37 ++ scala38
 
-object unroll extends Cross[UnrollModule](scalaVersions)
+  val scala212Latest = scala212.last
+  val scala213Latest = scala213.last
+  val scala3LTSLatest = scala33.last
+
+  // Use latest of each major version, use LTS for Scala 3
+  val scalaVersions: Seq[String] = Seq(scala212Latest, scala213Latest, scala3LTSLatest)
+}
+
+trait UnrollPublishModule extends PublishModule {
+  def publishVersion = VcsVersion.vcsState().format()
+
+  def pomSettings = PomSettings(
+    description = "Unroll default arguments for binary compatibility",
+    organization = "com.lihaoyi",
+    url = "https://github.com/com-lihaoyi/unroll",
+    licenses = Seq(License.MIT),
+    versionControl = VersionControl.github("com-lihaoyi", "unroll"),
+    developers = Seq(Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi"))
+  )
+}
+
+// Compiler plugin published against all point versions
+object plugin extends Cross[PluginModule](v.pluginScalaVersions)
+trait PluginModule extends CrossScalaModule with UnrollPublishModule {
+  override def crossFullScalaVersion = true
+  override def artifactName = "unroll-plugin"
+
+  def moduleDeps = Seq(annotation(scalaVersionBinaryPart))
+
+  def scalaVersionBinaryPart = crossScalaVersion match {
+    case s"2.12.$_" => v.scala212Latest
+    case s"2.13.$_" => v.scala213Latest
+    case s"3.$_.$_" => v.scala3LTSLatest
+  }
+
+  def mvnDeps = Task { Seq(v.scalaCompiler(crossScalaVersion)) }
+
+  def sources = Task.Sources {
+    val base = moduleDir / os.up / "unroll" / "plugin"
+    if (crossScalaVersion.startsWith("2.")) base / "src-2"
+    else base / "src-3"
+  }
+
+  def resources = Task.Sources(moduleDir / os.up / "unroll" / "plugin" / "resources")
+}
+
+// Annotation only needs binary version publishing
+object annotation extends Cross[AnnotationModule](v.scalaVersions)
+trait AnnotationModule extends CrossScalaModule with UnrollPublishModule {
+  override def artifactName = "unroll-annotation"
+
+  def sources = Task.Sources(moduleDir / os.up / "unroll" / "annotation" / "src")
+}
+
+object unroll extends Cross[UnrollModule](v.scalaVersions)
 trait UnrollModule extends Cross.Module[String]{
   trait InnerScalaModule extends CrossScalaModule {
     def crossValue = UnrollModule.this.crossValue
@@ -34,42 +98,19 @@ trait UnrollModule extends Cross.Module[String]{
     def scalaNativeVersion = "0.5.8"
   }
 
-  trait InnerPublishModule extends InnerScalaModule with PublishModule{
-
-    def publishVersion = VcsVersion.vcsState().format()
-
-    def pomSettings = PomSettings(
-      description = "Main method argument parser for Scala",
-      organization = "com.lihaoyi",
-      url = "https://github.com/com-lihaoyi/unroll",
-      licenses = Seq(License.MIT),
-      versionControl = VersionControl.github("com-lihaoyi", "unroll"),
-      developers = Seq(Developer("lihaoyi", "Li Haoyi", "https://github.com/lihaoyi"))
-    )
-  }
-
-  object annotation extends InnerPublishModule
-  object plugin extends InnerPublishModule{
-    def moduleDeps = Seq(annotation)
-    def mvnDeps = Task{
-      if (scalaVersion().startsWith("2.")) Seq(ivy"org.scala-lang:scala-compiler:${scalaVersion()}")
-      else  Seq(ivy"org.scala-lang:scala3-compiler_3:${scalaVersion()}")
-    }
-  }
-
   object negative extends ScalaModule {
-    override def moduleDir: Path = 
+    override def moduleDir: Path =
       if (UnrollModule.this.crossValue.startsWith("2.")) (super.moduleDir / "scala2") else (super.moduleDir / "scala3")
 
-    def moduleDeps: Seq[JavaModule] = Seq(annotation)
+    def moduleDeps: Seq[JavaModule] = Seq(annotation(UnrollModule.this.crossValue))
 
     def scalaVersion = UnrollModule.this.crossValue
 
-    def scalacPluginClasspath = Task{ Seq(plugin.jar()) }
+    def scalacPluginClasspath = Task{ Seq(plugin(UnrollModule.this.crossValue).jar()) }
 
     def scalacOptions = Task {
         Seq(
-          s"-Xplugin:${plugin.jar().path}",
+          s"-Xplugin:${plugin(UnrollModule.this.crossValue).jar().path}",
           "-Xplugin-require:unroll",
         )
       }
@@ -119,13 +160,13 @@ trait UnrollModule extends Cross.Module[String]{
       }
 
       trait Unrolled extends InnerScalaModule with PlatformScalaModule{
-        def moduleDeps: Seq[JavaModule] = Seq(annotation)
+        def moduleDeps: Seq[JavaModule] = Seq(annotation(UnrollModule.this.crossValue))
         def run(args: Task[Args] = Task.Anon(Args())) = Task.Command{/*donothing*/}
         def mimaPreviousArtifacts = Task{
           if (Tests.this.crossValue == "caseclass" && scalaVersion().startsWith("2.")) Nil
           else Task.traverse(mimaPrevious)(_.jvm.jar)()
         }
-        def scalacPluginClasspath = Task{ Seq(plugin.jar()) }
+        def scalacPluginClasspath = Task{ Seq(plugin(UnrollModule.this.crossValue).jar()) }
 
         // override def scalaCompilerClasspath = Task{
         //   super.scalaCompilerClasspath().filter(!_.toString().contains("scala3-compiler")) ++
@@ -133,7 +174,7 @@ trait UnrollModule extends Cross.Module[String]{
         // }
         def scalacOptions = Task{
           Seq(
-            s"-Xplugin:${plugin.jar().path}",
+            s"-Xplugin:${plugin(UnrollModule.this.crossValue).jar().path}",
             "-Xplugin-require:unroll",
             //"-Xprint:all",
             //"-Ydebug-error",
