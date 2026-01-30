@@ -7,6 +7,7 @@ from the annotated parameter, which are simple forwarders to the primary method 
 constructor implementation. This allows you to maintain binary compatibility when adding
 a new default parameter, without the boilerplate of manually defining forwarder methods.
 
+
 See the following PRs that demonstrate the usage of `@unroll` and the binary-compatibility
 boilerplate that can be saved:
 
@@ -36,6 +37,11 @@ See this original discussion for more context:
 * https://contributors.scala-lang.org/t/can-we-make-adding-a-parameter-with-a-default-value-binary-compatible
 
 ## Usage
+
+```scala
+def compileMvnDeps = Seq(mvn"com.lihaoyi:::unroll-plugin:0.3.0")
+def mvnDeps = Seq(mvn"com.lihaoyi:::unroll-annotation:0.3.0")
+```
 
 ### Methods
 
