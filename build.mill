@@ -1,4 +1,4 @@
-//| mill-version: 1.0.6
+//| mill-version: 1.1.0
 //| mvnDeps:
 //| - com.github.lolgab::mill-mima_mill1:0.2.0
 import mill._, scalalib._, publish._, scalajslib._, scalanativelib._
@@ -37,9 +37,9 @@ object v {
   val scalaVersions: Seq[String] = Seq(scala212Latest, scala213Latest, scala3LTSLatest)
 }
 
-trait UnrollPublishModule extends PublishModule {
+trait UnrollPublishModule extends ScalaModule with PublishModule {
   def publishVersion = VcsVersion.vcsState().format()
-
+  override def jvmVersion = Task { if scalaVersion().startsWith("3.8") then "17" else "11" }
   def pomSettings = PomSettings(
     description = "Unroll default arguments for binary compatibility",
     organization = "com.lihaoyi",
@@ -91,11 +91,11 @@ trait UnrollModule extends Cross.Module[String]{
   }
 
   trait InnerScalaJsModule extends InnerScalaModule with ScalaJSModule{
-    def scalaJSVersion = "1.19.0"
+    def scalaJSVersion = "1.20.2"
   }
 
   trait InnerScalaNativeModule extends InnerScalaModule with ScalaNativeModule{
-    def scalaNativeVersion = "0.5.8"
+    def scalaNativeVersion = "0.5.10"
   }
 
   object negative extends ScalaModule {
