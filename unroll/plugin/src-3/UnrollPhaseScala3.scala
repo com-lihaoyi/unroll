@@ -198,6 +198,12 @@ class UnrollPhaseScala3() extends PluginPhase {
   }
 
   def generateFromProduct(startParamIndices: List[Int], paramCount: Int, defdef: DefDef)(using Context) = {
+    // Handle both Block(stmts, Apply(...)) and direct Apply(...) forms
+    // In some Scala 3 versions, the rhs is a Block, in others it's directly an Apply
+    val (stmts, select, args) = defdef.rhs match {
+      case Block(stmts, Apply(select, args)) => (stmts, select, args)
+      case Apply(select, args) => (Nil, select, args)
+    }
     cpy.DefDef(defdef)(
       name = defdef.name,
       paramss = defdef.paramss,
@@ -205,7 +211,6 @@ class UnrollPhaseScala3() extends PluginPhase {
       rhs = Match(
         ref(defdef.paramss.head.head.asInstanceOf[ValDef].symbol).select(termName("productArity")),
         startParamIndices.map { paramIndex =>
-          val Block(stmts, Apply(select, args)) = defdef.rhs
           CaseDef(
             Literal(Constant(paramIndex)),
             EmptyTree,
