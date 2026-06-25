@@ -15,12 +15,12 @@ import os.Path
 object v {
   val scala212: Seq[String] = 18.to(21).map("2.12." + _)
   val scala213: Seq[String] = 11.to(18).map("2.13." + _)
-  val scala33: Seq[String] = 4.to(7).map("3.3." + _)
+  val scala33: Seq[String] = 4.to(8).map("3.3." + _)
   val scala34: Seq[String] = 0.to(3).map("3.4." + _)
   val scala35: Seq[String] = 0.to(2).map("3.5." + _)
   val scala36: Seq[String] = 0.to(4).map("3.6." + _)
   val scala37: Seq[String] = 0.to(4).map("3.7." + _)
-  val scala38: Seq[String] = 0.to(1).map("3.8." + _)
+  val scala38: Seq[String] = 0.to(4).map("3.8." + _)
 
   def scalaCompiler(scalaVersion: String): Dep =
     if (scalaVersion.startsWith("3.")) mvn"org.scala-lang::scala3-compiler:$scalaVersion"
